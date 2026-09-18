@@ -1,99 +1,59 @@
 import javax.swing.*;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
+import java.io.*;
+import java.util.ArrayList;
 
 public class Interfaz {
 
+    // Archivo donde se guardarán los usuarios
+    static final String ARCHIVO_USUARIOS = "usuarios.txt";
+
     public static void main(String[] args) {
 
-        JFrame ventana = new JFrame("MONOPOLIO CR");
-
-        ventana.setSize(1500, 900);
+        JFrame ventana = new JFrame("Mi Juego");
+        ventana.setSize(1200, 900);
         ventana.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         ventana.setLocationRelativeTo(null);
 
-        // ==========================
-        // FONDO
-        // ==========================
-
-        PanelFondo fondo =
-                new PanelFondo("imagenes/fondo.jpg");
-
+        PanelFondo fondo = new PanelFondo("imagenes/fondo.jpg");
         fondo.setLayout(new BorderLayout());
 
+        // -------------------------
+        // TÍTULO
+        // -------------------------
 
-        // ==========================
-        // TITULO
-        // ==========================
-
-        JLabel titulo = new JLabel("MOMNOPOLIO CR");
-
+        JLabel titulo = new JLabel("MONOPOLY CR");
         titulo.setForeground(Color.WHITE);
-        titulo.setFont(
-                new Font("Arial", Font.BOLD, 32)
-        );
+        titulo.setFont(new Font("Arial", Font.BOLD, 32));
 
-
-        // ==========================
-        // BOTONES CON IMAGEN
-        // ==========================
+        // -------------------------
+        // BOTONES
+        // -------------------------
 
         JButton crearPartida =
-                crearBotonImagen(
-                        "imagenes/crear.png",
-                        150,
-                        100
-                );
+                crearBotonImagen("imagenes/crear.png", 150, 100);
 
         JButton añadirUsuario =
-                crearBotonImagen(
-                        "imagenes/usuario.png",
-                        175,
-                        90
-                );
+                crearBotonImagen("imagenes/usuario.png", 150, 100);
 
         JButton entrarPartida =
-                crearBotonImagen(
-                        "imagenes/entrar.png",
-                        175,
-                        80
-                );
+                crearBotonImagen("imagenes/entrar.png", 150, 100);
 
+        // -------------------------
+        // PARTE SUPERIOR
+        // -------------------------
 
-        // ==========================
-        // PANEL SUPERIOR
-        // ==========================
-
-        JPanel panelSuperior =
-                new JPanel(new BorderLayout());
-
+        JPanel panelSuperior = new JPanel(new BorderLayout());
         panelSuperior.setOpaque(false);
-
         panelSuperior.setBorder(
-                BorderFactory.createEmptyBorder(
-                        15,
-                        20,
-                        0,
-                        20
-                )
+                BorderFactory.createEmptyBorder(15, 20, 0, 20)
         );
 
-
-        // ==========================
-        // PANEL DE BOTONES
-        // ==========================
-
-        JPanel botones =
-                new JPanel(
-                        new FlowLayout(
-                                FlowLayout.RIGHT,
-                                10,
-                                0
-                        )
-                );
+        JPanel botones = new JPanel(
+                new FlowLayout(FlowLayout.RIGHT, 10, 0)
+        );
 
         botones.setOpaque(false);
 
@@ -101,74 +61,246 @@ public class Interfaz {
         botones.add(añadirUsuario);
         botones.add(entrarPartida);
 
+        panelSuperior.add(titulo, BorderLayout.WEST);
+        panelSuperior.add(botones, BorderLayout.EAST);
 
-        // ==========================
-        // AGREGAR ELEMENTOS
-        // ==========================
+        fondo.add(panelSuperior, BorderLayout.NORTH);
 
-        panelSuperior.add(
-                titulo,
-                BorderLayout.WEST
-        );
-
-        panelSuperior.add(
-                botones,
-                BorderLayout.EAST
-        );
-
-        fondo.add(
-                panelSuperior,
-                BorderLayout.NORTH
-        );
-
-
-        // ==========================
-        // ACCIONES DE LOS BOTONES
-        // ==========================
+        // -------------------------
+        // BOTÓN CREAR PARTIDA
+        // -------------------------
 
         crearPartida.addActionListener(e -> {
 
             JOptionPane.showMessageDialog(
                     ventana,
-                    "Crear partida"
+                    "Aquí se abrirá la creación de la partida."
             );
 
         });
 
+        // -------------------------
+        // BOTÓN AÑADIR USUARIO
+        // -------------------------
 
-        añadirUsuario.addActionListener(e -> {
+        añadirUsuario.addActionListener(e -> registrarUsuario(ventana));
 
-            JOptionPane.showMessageDialog(
-                    ventana,
-                    "Añadir usuario"
-            );
+        // -------------------------
+        // BOTÓN ENTRAR A PARTIDA
+        // -------------------------
 
-        });
-
-
-        entrarPartida.addActionListener(e -> {
-
-            JOptionPane.showMessageDialog(
-                    ventana,
-                    "Entrar a partida"
-            );
-
-        });
-
-
-        // ==========================
-        // MOSTRAR
-        // ==========================
+        entrarPartida.addActionListener(e -> entrarUsuario(ventana));
 
         ventana.add(fondo);
-
         ventana.setVisible(true);
     }
 
 
-    // =====================================================
-    // CREAR BOTON CON IMAGEN
-    // =====================================================
+    // =========================================================
+    // REGISTRAR USUARIO
+    // =========================================================
+
+    public static void registrarUsuario(JFrame ventanaPrincipal) {
+
+        JTextField campoNombre = new JTextField();
+
+        Object[] mensaje = {
+                "Escribe tu nombre:",
+                campoNombre
+        };
+
+        int opcion = JOptionPane.showConfirmDialog(
+                ventanaPrincipal,
+                mensaje,
+                "Registrar usuario",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (opcion == JOptionPane.OK_OPTION) {
+
+            String nombre = campoNombre.getText().trim();
+
+            // Verificar que no esté vacío
+            if (nombre.isEmpty()) {
+
+                JOptionPane.showMessageDialog(
+                        ventanaPrincipal,
+                        "Debes escribir un nombre.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+
+                return;
+            }
+
+            // Verificar si ya existe
+            if (usuarioExiste(nombre)) {
+
+                JOptionPane.showMessageDialog(
+                        ventanaPrincipal,
+                        "Ese usuario ya existe.",
+                        "Usuario existente",
+                        JOptionPane.WARNING_MESSAGE
+                );
+
+                return;
+            }
+
+            // Guardar usuario
+            guardarUsuario(nombre);
+
+            JOptionPane.showMessageDialog(
+                    ventanaPrincipal,
+                    "Usuario registrado correctamente.",
+                    "Registro exitoso",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        }
+    }
+
+
+    // =========================================================
+    // ENTRAR CON USUARIO
+    // =========================================================
+
+    public static void entrarUsuario(JFrame ventanaPrincipal) {
+
+        JTextField campoNombre = new JTextField();
+
+        Object[] mensaje = {
+                "Escribe tu nombre de usuario:",
+                campoNombre
+        };
+
+        int opcion = JOptionPane.showConfirmDialog(
+                ventanaPrincipal,
+                mensaje,
+                "Iniciar sesión",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (opcion == JOptionPane.OK_OPTION) {
+
+            String nombre = campoNombre.getText().trim();
+
+            if (nombre.isEmpty()) {
+
+                JOptionPane.showMessageDialog(
+                        ventanaPrincipal,
+                        "Debes escribir un nombre.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+
+                return;
+            }
+
+            // Comprobar si existe
+            if (usuarioExiste(nombre)) {
+
+                JOptionPane.showMessageDialog(
+                        ventanaPrincipal,
+                        "¡Bienvenido, " + nombre + "!",
+                        "Inicio de sesión",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+
+                // Aquí posteriormente podemos abrir
+                // la pantalla principal del juego.
+
+            } else {
+
+                JOptionPane.showMessageDialog(
+                        ventanaPrincipal,
+                        "El usuario no existe.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+            }
+        }
+    }
+
+
+    // =========================================================
+    // GUARDAR USUARIO
+    // =========================================================
+
+    public static void guardarUsuario(String nombre) {
+
+        try {
+
+            FileWriter escritor = new FileWriter(
+                    ARCHIVO_USUARIOS,
+                    true
+            );
+
+            BufferedWriter buffer = new BufferedWriter(escritor);
+
+            buffer.write(nombre);
+            buffer.newLine();
+
+            buffer.close();
+
+        } catch (IOException e) {
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    "No se pudo guardar el usuario.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+
+    // =========================================================
+    // COMPROBAR SI EXISTE
+    // =========================================================
+
+    public static boolean usuarioExiste(String nombreBuscado) {
+
+        File archivo = new File(ARCHIVO_USUARIOS);
+
+        // Si el archivo todavía no existe,
+        // significa que no hay usuarios.
+        if (!archivo.exists()) {
+            return false;
+        }
+
+        try {
+
+            BufferedReader lector =
+                    new BufferedReader(
+                            new FileReader(archivo)
+                    );
+
+            String nombre;
+
+            while ((nombre = lector.readLine()) != null) {
+
+                if (nombre.equalsIgnoreCase(nombreBuscado)) {
+
+                    lector.close();
+                    return true;
+                }
+            }
+
+            lector.close();
+
+        } catch (IOException e) {
+
+            return false;
+        }
+
+        return false;
+    }
+
+
+    // =========================================================
+    // CREAR BOTÓN CON IMAGEN
+    // =========================================================
 
     public static JButton crearBotonImagen(
             String ruta,
@@ -176,14 +308,10 @@ public class Interfaz {
             int alto
     ) {
 
-        ImageIcon iconoOriginal =
-                new ImageIcon(ruta);
+        ImageIcon iconoOriginal = new ImageIcon(ruta);
 
-        Image imagenOriginal =
-                iconoOriginal.getImage();
+        Image imagenOriginal = iconoOriginal.getImage();
 
-
-        // Imagen normal
         Image imagenNormal =
                 imagenOriginal.getScaledInstance(
                         ancho,
@@ -191,8 +319,6 @@ public class Interfaz {
                         Image.SCALE_SMOOTH
                 );
 
-
-        // Imagen cuando pasamos el cursor
         Image imagenGrande =
                 imagenOriginal.getScaledInstance(
                         ancho + 12,
@@ -200,147 +326,96 @@ public class Interfaz {
                         Image.SCALE_SMOOTH
                 );
 
-
         ImageIcon iconoNormal =
                 new ImageIcon(imagenNormal);
 
         ImageIcon iconoGrande =
                 new ImageIcon(imagenGrande);
 
+        JButton boton = new JButton(iconoNormal);
 
-        // Crear botón
-        JButton boton =
-                new JButton(iconoNormal);
-
-
-        // Quitar apariencia tradicional
         boton.setBorderPainted(false);
         boton.setFocusPainted(false);
         boton.setContentAreaFilled(false);
         boton.setOpaque(false);
+        boton.setMargin(new Insets(0, 0, 0, 0));
 
-
-        // Quitar espacio interno
-        boton.setMargin(
-                new Insets(0, 0, 0, 0)
-        );
-
-
-        // Cursor de mano
         boton.setCursor(
                 new Cursor(Cursor.HAND_CURSOR)
         );
 
-
-        // Tamaño normal
         boton.setPreferredSize(
-                new Dimension(
-                        ancho,
-                        alto
-                )
+                new Dimension(ancho, alto)
         );
 
+        // Animación al pasar el mouse
+        boton.addMouseListener(new MouseAdapter() {
 
-        // =================================================
-        // ANIMACION DEL MOUSE
-        // =================================================
+            @Override
+            public void mouseEntered(MouseEvent e) {
 
-        boton.addMouseListener(
-                new MouseAdapter() {
+                boton.setIcon(iconoGrande);
 
-                    @Override
-                    public void mouseEntered(
-                            MouseEvent e
-                    ) {
+                boton.setPreferredSize(
+                        new Dimension(
+                                ancho + 12,
+                                alto + 12
+                        )
+                );
 
-                        boton.setIcon(iconoGrande);
+                boton.getParent().revalidate();
+                boton.repaint();
+            }
 
-                        boton.setPreferredSize(
-                                new Dimension(
-                                        ancho + 12,
-                                        alto + 12
-                                )
-                        );
+            @Override
+            public void mouseExited(MouseEvent e) {
 
-                        boton.getParent()
-                                .revalidate();
+                boton.setIcon(iconoNormal);
 
-                        boton.repaint();
-                    }
+                boton.setPreferredSize(
+                        new Dimension(ancho, alto)
+                );
 
-
-                    @Override
-                    public void mouseExited(
-                            MouseEvent e
-                    ) {
-
-                        boton.setIcon(iconoNormal);
-
-                        boton.setPreferredSize(
-                                new Dimension(
-                                        ancho,
-                                        alto
-                                )
-                        );
-
-                        boton.getParent()
-                                .revalidate();
-
-                        boton.repaint();
-                    }
-                }
-        );
-
+                boton.getParent().revalidate();
+                boton.repaint();
+            }
+        });
 
         return boton;
     }
 }
 
 
-// =========================================================
-// PANEL DEL FONDO
-// =========================================================
+// =============================================================
+// PANEL PARA EL FONDO
+// =============================================================
 
 class PanelFondo extends JPanel {
 
     private Image imagen;
 
-
     public PanelFondo(String ruta) {
 
-        imagen =
-                new ImageIcon(ruta).getImage();
+        imagen = new ImageIcon(ruta).getImage();
     }
 
-
     @Override
-    protected void paintComponent(
-            Graphics g
-    ) {
+    protected void paintComponent(Graphics g) {
 
         super.paintComponent(g);
 
+        Graphics2D g2 = (Graphics2D) g;
 
-        Graphics2D g2 =
-                (Graphics2D) g;
-
-
-        // Mejor calidad al escalar
         g2.setRenderingHint(
                 RenderingHints.KEY_INTERPOLATION,
-                RenderingHints
-                        .VALUE_INTERPOLATION_BICUBIC
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC
         );
-
 
         g2.setRenderingHint(
                 RenderingHints.KEY_RENDERING,
-                RenderingHints
-                        .VALUE_RENDER_QUALITY
+                RenderingHints.VALUE_RENDER_QUALITY
         );
 
-
-        // Dibujar fondo
         g2.drawImage(
                 imagen,
                 0,
@@ -350,12 +425,10 @@ class PanelFondo extends JPanel {
                 this
         );
 
-
-        // Capa oscura
+        // Oscurecer un poco el fondo
         g2.setColor(
                 new Color(0, 0, 0, 80)
         );
-
 
         g2.fillRect(
                 0,
