@@ -1,6 +1,6 @@
 /**
  * Clase Jugador
- * Representa un jugadorcom participante del Juego.
+ * Representa un jugador como participante del Juego.
  * Contiene la informacion de cada Jugador.
  */
 public class Jugador {
@@ -8,8 +8,8 @@ public class Jugador {
     // --- Atributos del Jugador ---
 
     private String id;
-    private String nombre;           // Nombre del jugador
-    private int saldo;               // Dinero del jugador
+    private String nombre;
+    private int saldo;
     private int posicionActual;
     private boolean activo;
 
@@ -23,8 +23,8 @@ public class Jugador {
         this.id = id;
         this.nombre = nombre;
         this.saldo = saldoInicial;
-        this.posicionActual = 0;     // Todos los jugadores inician en la posición 0
-        this.activo = true;          // Inicia como un jugador activo en la partida
+        this.posicionActual = 0;
+        this.activo = true;
     }
 
     // --- Métodos de gestión de dinero ---
@@ -40,27 +40,31 @@ public class Jugador {
 
     /**
      * Resta el dinero gastado por cada jugador de su saldo.
-     * Retorna true si se pudo restar el monto del saldo actual del jugador
-     * Retorna false si los fondos del juegdor no son suficientes.
+     * Retorna true si se pudo restar el monto del saldo actual del jugador.
+     * Retorna false si los fondos del jugador no son suficientes.
      */
     public boolean debitar(int monto) {
         if (monto <= this.saldo) {
             this.saldo -= monto;
             return true;
         }
-        return false; // Saldo insuficiente
+
+        return false;
     }
 
     // --- Métodos de movimiento ---
 
     /**
-     * Mueve al jugador por el tablero segun el resultado de los dados.
-     * Utiliza el resultado de los dados, la psocicion actual y el total de casillas.
-     *
+     * Mueve al jugador por el tablero según el resultado de los dados.
      */
-    public void mover(int casillasAvanzar, int totalCasillasTablero) {
-        // Usamos % para tomar el residuo de la division y segun este residuo se determina la nueva pocision.
-        this.posicionActual = (this.posicionActual + casillasAvanzar) % totalCasillasTablero;
+    public void mover(
+            int casillasAvanzar,
+            int totalCasillasTablero
+    ) {
+
+        this.posicionActual =
+                (this.posicionActual + casillasAvanzar)
+                        % totalCasillasTablero;
     }
 
     // --- Getters y Setters Básicos ---

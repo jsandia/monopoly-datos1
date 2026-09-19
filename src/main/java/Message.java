@@ -1,31 +1,82 @@
 import java.io.Serializable;
 
-/**
- * Protocolo de mensajes del juego.
- * Cada tipo de mensaje es un "record": inmutable, liviano y fácil de
- * extender. Al ser un "sealed interface", el compilador te obliga a
- * manejar todos los casos posibles en el switch (evita bugs por olvido).
- *
- * Usa ObjectOutputStream/ObjectInputStream para enviarse por el socket,
- * así que todo tiene que ser Serializable.
- */
-public sealed interface Message extends Serializable {
+public sealed interface Message extends Serializable
+        permits Message.Welcome,
+        Message.PlayerMove,
+        Message.GameState,
+        Message.Ping,
+        Message.Pong,
+        Message.PlayerDisconnected,
+        Message.Register,
+        Message.Login,
+        Message.CreateGame,
+        Message.JoinGame,
+        Message.Response {
 
-    // El servidor le asigna un id de jugador (0 o 1) al conectarse
+    // =========================================================
+    // MENSAJES ORIGINALES
+    // =========================================================
+
     record Welcome(int playerId) implements Message {}
 
-    // Un jugador envía su nueva posición / acción
-    record PlayerMove(int playerId, double x, double y, String action) implements Message {}
+    record PlayerMove(
+            int playerId,
+            double x,
+            double y,
+            String action
+    ) implements Message {}
 
-    // El servidor retransmite el estado completo a ambos clientes
-    record GameState(double p0x, double p0y, double p1x, double p1y, int score0, int score1) implements Message {}
+    record GameState(
+            double p0x,
+            double p0y,
+            double p1x,
+            double p1y,
+            int score0,
+            int score1
+    ) implements Message {}
 
-    // Latido para detectar desconexiones (opcional, útil por wifi inestable)
     record Ping(long timestamp) implements Message {}
 
-    // Respuesta a un Ping, para medir el tiempo de ida y vuelta (RTT)
     record Pong(long timestamp) implements Message {}
 
-    // Un jugador se desconectó
     record PlayerDisconnected(int playerId) implements Message {}
+
+
+    // =========================================================
+    // REGISTRO Y LOGIN
+    // =========================================================
+
+    record Register(
+            String nombre
+    ) implements Message {}
+
+    record Login(
+            String nombre
+    ) implements Message {}
+
+
+    // =========================================================
+    // PARTIDAS
+    // =========================================================
+
+    record CreateGame(
+            String jugador1,
+            String jugador2
+    ) implements Message {}
+
+    record JoinGame(
+            String codigo,
+            String jugador1,
+            String jugador2
+    ) implements Message {}
+
+
+    // =========================================================
+    // RESPUESTA DEL SERVIDOR
+    // =========================================================
+
+    record Response(
+            String tipo,
+            String mensaje
+    ) implements Message {}
 }

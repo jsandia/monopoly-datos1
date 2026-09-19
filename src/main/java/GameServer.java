@@ -1,30 +1,55 @@
 import java.io.*;
 import java.net.*;
+import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * Servidor del juego. Se corre en UNA sola de las dos computadoras
- * (la que va a hacer de "host"). La otra computadora se conecta a
- * esta con GameClient usando la IP de esta máquina.
- *
- * Cuando uses la Raspberry Pi Pico W como punto de acceso WiFi:
- * las dos PCs se conectan a la red que emite la Pico, y esta
- * computadora sigue siendo el host del juego (la Pico solo da la red,
- * no corre la lógica del juego, a menos que luego decidas portar
- * esto a MicroPython/C con sockets).
- */
 public class GameServer {
 
-    private static final int DEFAULT_PORT = 5000;
+    public static final int DEFAULT_PORT = 5000;
+
     private final int port;
 
-    // Estado compartido del juego (protegido porque 2 hilos lo tocan a la vez)
-    private volatile double p0x = 0, p0y = 0;
-    private volatile double p1x = 0, p1y = 0;
-    private volatile int score0 = 0, score1 = 0;
+    private ServerSocket serverSocket;
 
-    private final ObjectOutputStream[] outputs = new ObjectOutputStream[2];
-    private final ExecutorService pool = Executors.newFixedThreadPool(4);
+    private final ExecutorService pool =
+            Executors.newFixedThreadPool(4);
+
+    // =========================================================
+    // USUARIOS
+    // =========================================================
+
+    private final Set<String> usuarios =
+            ConcurrentHashMap.newKeySet();
+
+    // =========================================================
+    // PARTIDAS
+    // =========================================================
+
+    private final Map<String, Partida> partidas =
+            new ConcurrentHashMap<>();
+
+    private final Random random =
+            new Random();
+
+    // =========================================================
+    // ESTADO DEL JUEGO ORIGINAL
+    // =========================================================
+
+    private double p0x = 0;
+    private double p0y = 0;
+
+    private double p1x = 0;
+    private double p1y = 0;
+
+    private int score0 = 0;
+    private int score1 = 0;
+
+    private final Object gameLock = new Object();
+
+
+    // =========================================================
+    // CONSTRUCTORES
+    // =========================================================
 
     public GameServer() {
         this(DEFAULT_PORT);
@@ -34,90 +59,782 @@ public class GameServer {
         this.port = port;
     }
 
-    public static void main(String[] args) throws IOException {
-        new GameServer().start();
-    }
+
+    // =========================================================
+    // INICIAR SERVIDOR
+    // =========================================================
 
     public void start() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Servidor esperando jugadores en el puerto " + port);
 
-            // Se anuncia en la red para que los clientes lo encuentren solos,
-            // sin que nadie tenga que escribir la IP a mano.
-            Discovery.hostAnnounce(port);
+        serverSocket =
+                new ServerSocket(port);
 
-            for (int playerId = 0; playerId < 2; playerId++) {
-                Socket socket = serverSocket.accept(); // espera a que se conecte un jugador
-                System.out.println("Jugador " + playerId + " conectado desde " + socket.getInetAddress());
-                handleNewPlayer(socket, playerId);
-            }
+        System.out.println(
+                "Servidor iniciado en puerto "
+                        + port
+        );
 
-            System.out.println("Los 2 jugadores están conectados. Partida en curso...");
-            // el servidor sigue vivo mientras los hilos de cada jugador corren
-            pool.shutdown();
-            pool.awaitTermination(1, TimeUnit.HOURS);
+        Discovery.hostAnnounce(port);
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        System.out.println(
+                "Esperando 2 computadoras..."
+        );
+
+        int playerId = 0;
+
+        while (playerId < 2) {
+
+            Socket socket =
+                    serverSocket.accept();
+
+            int id =
+                    playerId;
+
+            System.out.println(
+                    "Computadora "
+                            + id
+                            + " conectada: "
+                            + socket.getInetAddress()
+            );
+
+            pool.submit(
+                    () -> manejarCliente(socket, id)
+            );
+
+            playerId++;
         }
+
+        System.out.println(
+                "Ya hay 2 computadoras conectadas."
+        );
     }
 
-    private void handleNewPlayer(Socket socket, int playerId) throws IOException {
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-        outputs[playerId] = out;
 
-        out.writeObject(new Message.Welcome(playerId));
-        out.flush();
+    // =========================================================
+    // MANEJAR CLIENTE
+    // =========================================================
 
-        pool.submit(() -> playerLoop(socket, in, playerId));
-    }
+    private void manejarCliente(
+            Socket socket,
+            int playerId
+    ) {
 
-    private void playerLoop(Socket socket, ObjectInputStream in, int playerId) {
         try {
-            while (true) {
-                Message msg = (Message) in.readObject();
 
-                switch (msg) {
-                    case Message.PlayerMove move -> {
-                        if (playerId == 0) { p0x = move.x(); p0y = move.y(); }
-                        else               { p1x = move.x(); p1y = move.y(); }
-                        broadcastState();
-                    }
-                    case Message.Ping ping -> { /* podés responder con otro Ping si querés medir latencia */ }
-                    default -> { /* Welcome, GameState, PlayerDisconnected no los manda el cliente */ }
+            ObjectOutputStream out =
+                    new ObjectOutputStream(
+                            socket.getOutputStream()
+                    );
+
+            out.flush();
+
+            ObjectInputStream in =
+                    new ObjectInputStream(
+                            socket.getInputStream()
+                    );
+
+            // Avisamos qué conexión recibió
+            out.writeObject(
+                    new Message.Welcome(playerId)
+            );
+
+            out.flush();
+
+
+            while (true) {
+
+                Object objeto =
+                        in.readObject();
+
+                if (!(objeto instanceof Message mensaje)) {
+                    continue;
+                }
+
+
+                // =================================================
+                // REGISTRAR
+                // =================================================
+
+                if (mensaje instanceof Message.Register registro) {
+
+                    registrarUsuario(
+                            registro.nombre(),
+                            out
+                    );
+                }
+
+
+                // =================================================
+                // LOGIN
+                // =================================================
+
+                else if (mensaje instanceof Message.Login login) {
+
+                    iniciarSesion(
+                            login.nombre(),
+                            out
+                    );
+                }
+
+
+                // =================================================
+                // CREAR PARTIDA
+                // =================================================
+
+                else if (mensaje instanceof Message.CreateGame crear) {
+
+                    crearPartida(
+                            crear.jugador1(),
+                            crear.jugador2(),
+                            out
+                    );
+                }
+
+
+                // =================================================
+                // ENTRAR A PARTIDA
+                // =================================================
+
+                else if (mensaje instanceof Message.JoinGame entrar) {
+
+                    entrarPartida(
+                            entrar.codigo(),
+                            entrar.jugador1(),
+                            entrar.jugador2(),
+                            out
+                    );
+                }
+
+
+                // =================================================
+                // MOVIMIENTO ORIGINAL
+                // =================================================
+
+                else if (mensaje instanceof Message.PlayerMove movimiento) {
+
+                    procesarMovimiento(
+                            movimiento,
+                            playerId,
+                            out
+                    );
+                }
+
+
+                // =================================================
+                // PING
+                // =================================================
+
+                else if (mensaje instanceof Message.Ping ping) {
+
+                    out.writeObject(
+                            new Message.Pong(
+                                    ping.timestamp()
+                            )
+                    );
+
+                    out.flush();
                 }
             }
-        } catch (IOException | ClassNotFoundException e) {
-            System.out.println("Jugador " + playerId + " se desconectó");
-            outputs[playerId] = null; // evita seguir intentando escribirle a un socket cerrado
-            broadcastDisconnect(playerId);
+
+        } catch (EOFException e) {
+
+            System.out.println(
+                    "Computadora "
+                            + playerId
+                            + " se desconectó."
+            );
+
+        } catch (Exception e) {
+
+            System.out.println(
+                    "Error con la computadora "
+                            + playerId
+            );
+
+            e.printStackTrace();
+
         } finally {
-            try { socket.close(); } catch (IOException ignored) {}
+
+            pool.submit(
+                    () -> {
+                        // El servidor sigue funcionando
+                    }
+            );
         }
     }
 
-    private synchronized void broadcastState() {
-        Message.GameState state = new Message.GameState(p0x, p0y, p1x, p1y, score0, score1);
-        for (ObjectOutputStream out : outputs) {
-            if (out == null) continue;
-            try {
-                out.reset(); // evita que ObjectOutputStream cachee objetos viejos
-                out.writeObject(state);
-                out.flush();
-            } catch (IOException e) {
-                // ese jugador ya no está disponible, se ignora el error acá
+
+    // =========================================================
+    // REGISTRAR USUARIO
+    // =========================================================
+
+    private void registrarUsuario(
+            String nombre,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        nombre =
+                nombre.trim();
+
+        if (nombre.isEmpty()) {
+
+            enviarRespuesta(
+                    out,
+                    "ERROR",
+                    "Debes escribir un nombre."
+            );
+
+            return;
+        }
+
+        String nombreFinal =
+                nombre;
+
+        boolean existe =
+                usuarios.stream()
+                        .anyMatch(
+                                usuario ->
+                                        usuario.equalsIgnoreCase(
+                                                nombreFinal
+                                        )
+                        );
+
+        if (existe) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_EXISTS",
+                    "Ese usuario ya existe."
+            );
+
+            return;
+        }
+
+        usuarios.add(nombre);
+
+        System.out.println(
+                "Usuario registrado: "
+                        + nombre
+        );
+
+        enviarRespuesta(
+                out,
+                "REGISTER_OK",
+                "Usuario registrado correctamente."
+        );
+    }
+
+
+    // =========================================================
+    // LOGIN
+    // =========================================================
+
+    private void iniciarSesion(
+            String nombre,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        nombre =
+                nombre.trim();
+
+        if (nombre.isEmpty()) {
+
+            enviarRespuesta(
+                    out,
+                    "ERROR",
+                    "Debes escribir un nombre."
+            );
+
+            return;
+        }
+
+        String nombreFinal =
+                nombre;
+
+        boolean existe =
+                usuarios.stream()
+                        .anyMatch(
+                                usuario ->
+                                        usuario.equalsIgnoreCase(
+                                                nombreFinal
+                                        )
+                        );
+
+        if (!existe) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_NOT_FOUND",
+                    "El usuario no está registrado."
+            );
+
+            return;
+        }
+
+        enviarRespuesta(
+                out,
+                "LOGIN_OK",
+                "Inicio de sesión correcto."
+        );
+    }
+
+
+    // =========================================================
+    // CREAR PARTIDA
+    // =========================================================
+
+    private void crearPartida(
+            String jugador1,
+            String jugador2,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        jugador1 =
+                jugador1.trim();
+
+        jugador2 =
+                jugador2.trim();
+
+
+        // -------------------------
+        // CAMPOS VACÍOS
+        // -------------------------
+
+        if (jugador1.isEmpty()
+                || jugador2.isEmpty()) {
+
+            enviarRespuesta(
+                    out,
+                    "ERROR",
+                    "Debes escribir los dos jugadores."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // COMPROBAR USUARIOS
+        // -------------------------
+
+        if (!usuarioRegistrado(jugador1)) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_NOT_FOUND",
+                    "El usuario "
+                            + jugador1
+                            + " no está registrado."
+            );
+
+            return;
+        }
+
+        if (!usuarioRegistrado(jugador2)) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_NOT_FOUND",
+                    "El usuario "
+                            + jugador2
+                            + " no está registrado."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // GENERAR CÓDIGO
+        // -------------------------
+
+        String codigo =
+                generarCodigo();
+
+
+        // -------------------------
+        // CREAR PARTIDA
+        // -------------------------
+
+        Partida partida =
+                new Partida(
+                        codigo,
+                        jugador1,
+                        jugador2
+                );
+
+        partidas.put(
+                codigo,
+                partida
+        );
+
+
+        System.out.println(
+                "Partida creada: "
+                        + codigo
+                        + " -> "
+                        + jugador1
+                        + ", "
+                        + jugador2
+        );
+
+
+        enviarRespuesta(
+                out,
+                "GAME_CREATED",
+                codigo
+        );
+    }
+
+
+    // =========================================================
+    // ENTRAR A PARTIDA
+    // =========================================================
+
+    private void entrarPartida(
+            String codigo,
+            String jugador1,
+            String jugador2,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        codigo =
+                codigo.trim();
+
+        jugador1 =
+                jugador1.trim();
+
+        jugador2 =
+                jugador2.trim();
+
+
+        // -------------------------
+        // COMPROBAR CÓDIGO
+        // -------------------------
+
+        if (!codigo.matches("\\d{4}")) {
+
+            enviarRespuesta(
+                    out,
+                    "ERROR",
+                    "El código debe tener 4 dígitos."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // COMPROBAR USUARIOS
+        // -------------------------
+
+        if (!usuarioRegistrado(jugador1)) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_NOT_FOUND",
+                    "El usuario "
+                            + jugador1
+                            + " no está registrado."
+            );
+
+            return;
+        }
+
+        if (!usuarioRegistrado(jugador2)) {
+
+            enviarRespuesta(
+                    out,
+                    "USER_NOT_FOUND",
+                    "El usuario "
+                            + jugador2
+                            + " no está registrado."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // BUSCAR PARTIDA
+        // -------------------------
+
+        Partida partida =
+                partidas.get(codigo);
+
+        if (partida == null) {
+
+            enviarRespuesta(
+                    out,
+                    "GAME_NOT_FOUND",
+                    "La partida no existe."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // COMPROBAR SI YA ESTÁ LLENA
+        // -------------------------
+
+        if (partida.jugador3 != null
+                || partida.jugador4 != null) {
+
+            enviarRespuesta(
+                    out,
+                    "GAME_FULL",
+                    "La partida ya tiene 4 jugadores."
+            );
+
+            return;
+        }
+
+
+        // -------------------------
+        // AGREGAR LOS DOS JUGADORES
+        // -------------------------
+
+        partida.jugador3 =
+                jugador1;
+
+        partida.jugador4 =
+                jugador2;
+
+
+        System.out.println(
+                "Partida "
+                        + codigo
+                        + " completa:"
+        );
+
+        System.out.println(
+                "  Jugador 1: "
+                        + partida.jugador1
+        );
+
+        System.out.println(
+                "  Jugador 2: "
+                        + partida.jugador2
+        );
+
+        System.out.println(
+                "  Jugador 3: "
+                        + partida.jugador3
+        );
+
+        System.out.println(
+                "  Jugador 4: "
+                        + partida.jugador4
+        );
+
+
+        enviarRespuesta(
+                out,
+                "GAME_JOINED",
+                "Partida unida correctamente."
+        );
+    }
+
+
+    // =========================================================
+    // COMPROBAR USUARIO
+    // =========================================================
+
+    private boolean usuarioRegistrado(
+            String nombre
+    ) {
+
+        return usuarios.stream()
+                .anyMatch(
+                        usuario ->
+                                usuario.equalsIgnoreCase(
+                                        nombre
+                                )
+                );
+    }
+
+
+    // =========================================================
+    // GENERAR CÓDIGO
+    // =========================================================
+
+    private String generarCodigo() {
+
+        String codigo;
+
+        do {
+
+            int numero =
+                    1000
+                            + random.nextInt(9000);
+
+            codigo =
+                    String.valueOf(numero);
+
+        } while (
+                partidas.containsKey(codigo)
+        );
+
+        return codigo;
+    }
+
+
+    // =========================================================
+    // RESPUESTA
+    // =========================================================
+
+    private void enviarRespuesta(
+            ObjectOutputStream out,
+            String tipo,
+            String mensaje
+    ) throws IOException {
+
+        out.writeObject(
+                new Message.Response(
+                        tipo,
+                        mensaje
+                )
+        );
+
+        out.flush();
+    }
+
+
+    // =========================================================
+    // MOVIMIENTO ORIGINAL
+    // =========================================================
+
+    private void procesarMovimiento(
+            Message.PlayerMove movimiento,
+            int playerId,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            if (playerId == 0) {
+
+                p0x =
+                        movimiento.x();
+
+                p0y =
+                        movimiento.y();
+
+            } else {
+
+                p1x =
+                        movimiento.x();
+
+                p1y =
+                        movimiento.y();
             }
+
+            if (movimiento.action() != null) {
+
+                if (playerId == 0) {
+                    score0++;
+                } else {
+                    score1++;
+                }
+            }
+
+
+            Message.GameState estado =
+                    new Message.GameState(
+                            p0x,
+                            p0y,
+                            p1x,
+                            p1y,
+                            score0,
+                            score1
+                    );
+
+            out.writeObject(estado);
+
+            out.flush();
         }
     }
 
-    private synchronized void broadcastDisconnect(int playerId) {
-        for (ObjectOutputStream out : outputs) {
-            if (out == null) continue;
-            try {
-                out.writeObject(new Message.PlayerDisconnected(playerId));
-                out.flush();
-            } catch (IOException ignored) {}
+
+    // =========================================================
+    // CERRAR SERVIDOR
+    // =========================================================
+
+    public void stop()
+            throws IOException {
+
+        if (serverSocket != null
+                && !serverSocket.isClosed()) {
+
+            serverSocket.close();
+        }
+
+        pool.shutdownNow();
+    }
+
+
+    // =========================================================
+    // PARTIDA
+    // =========================================================
+
+    private static class Partida {
+
+        String codigo;
+
+        String jugador1;
+        String jugador2;
+
+        String jugador3;
+        String jugador4;
+
+
+        Partida(
+                String codigo,
+                String jugador1,
+                String jugador2
+        ) {
+
+            this.codigo =
+                    codigo;
+
+            this.jugador1 =
+                    jugador1;
+
+            this.jugador2 =
+                    jugador2;
+
+            this.jugador3 =
+                    null;
+
+            this.jugador4 =
+                    null;
+        }
+    }
+
+
+    // =========================================================
+    // MAIN
+    // =========================================================
+
+    public static void main(
+            String[] args
+    ) {
+
+        try {
+
+            GameServer servidor =
+                    new GameServer();
+
+            servidor.start();
+
+        } catch (IOException e) {
+
+            System.out.println(
+                    "No se pudo iniciar el servidor."
+            );
+
+            e.printStackTrace();
         }
     }
 }
