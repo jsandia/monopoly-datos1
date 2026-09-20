@@ -1,3 +1,4 @@
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -15,11 +16,19 @@ public class Interfaz {
 
     static GameClient cliente;
 
+    // =========================================================
+    // SERVIDOR
+    // =========================================================
+
+    static GameServer servidor;
+
+    static boolean servidorIniciado = false;
+
 
     public static void main(String[] args) {
 
         JFrame ventana = new JFrame("MONOPOLY CR");
-        ventana.setSize(1200, 900);
+        ventana.setSize(1200, 800);
         ventana.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         ventana.setLocationRelativeTo(null);
 
@@ -39,14 +48,8 @@ public class Interfaz {
             cliente.conectar();
 
         } catch (Exception e) {
-
-            JOptionPane.showMessageDialog(
-                    ventana,
-                    "No se pudo conectar al servidor.\n\n"
-                            + "Primero debes iniciar GameServer.",
-                    "Error de conexión",
-                    JOptionPane.ERROR_MESSAGE
-            );
+            cliente=null;
+            
         }
 
 
@@ -82,6 +85,18 @@ public class Interfaz {
                         "imagenes/entrar.png",
                         180,
                         80
+                );
+
+
+        // =========================================================
+        // NUEVO BOTÓN DEL SERVIDOR
+        // =========================================================
+
+        JButton iniciarServidor =
+                crearBotonImagen(
+                        "imagenes/servidor.png",
+                        180,
+                        100
                 );
 
 
@@ -139,6 +154,30 @@ public class Interfaz {
         );
 
 
+        // =========================================================
+        // BOTÓN SERVIDOR - ESQUINA INFERIOR IZQUIERDA
+        // =========================================================
+
+        JPanel panelServidor =
+                new JPanel(
+                        new FlowLayout(
+                                FlowLayout.LEFT,
+                                20,
+                                15
+                        )
+                );
+
+        panelServidor.setOpaque(false);
+
+        panelServidor.add(iniciarServidor);
+
+
+        fondo.add(
+                panelServidor,
+                BorderLayout.SOUTH
+        );
+
+
         // =========================
         // CREAR PARTIDA
         // =========================
@@ -166,9 +205,149 @@ public class Interfaz {
         );
 
 
+        // =========================================================
+        // INICIAR SERVIDOR
+        // =========================================================
+
+        iniciarServidor.addActionListener(
+                e -> iniciarServidor(ventana)
+        );
+
+
         ventana.add(fondo);
 
         ventana.setVisible(true);
+    }
+
+
+    // =========================================================
+    // INICIAR SERVIDOR
+    // =========================================================
+
+    public static void iniciarServidor(
+            JFrame ventanaPrincipal
+    ) {
+
+        // ---------------------------------------------------------
+        // COMPROBAR SI YA ESTÁ INICIADO
+        // ---------------------------------------------------------
+
+        if (servidorIniciado) {
+
+            JOptionPane.showMessageDialog(
+                    ventanaPrincipal,
+                    "El servidor ya está iniciado.",
+                    "Servidor",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+
+        // ---------------------------------------------------------
+        // INICIAR SERVIDOR EN OTRO HILO
+        // ---------------------------------------------------------
+
+        Thread hiloServidor =
+                new Thread(
+                        () -> {
+
+                            try {
+
+                                servidor =
+                                        new GameServer();
+
+
+                                servidorIniciado = true;
+
+
+                                System.out.println(
+                                        "GameServer iniciado."
+                                );
+
+
+                                servidor.start();
+
+
+                            } catch (IOException e) {
+
+                                servidorIniciado = false;
+
+
+                                SwingUtilities.invokeLater(
+                                        () -> JOptionPane.showMessageDialog(
+                                                ventanaPrincipal,
+
+                                                "No se pudo iniciar el servidor.\n\n"
+                                                        + e.getMessage(),
+
+                                                "Error del servidor",
+
+                                                JOptionPane.ERROR_MESSAGE
+                                        )
+                                );
+                            }
+                        }
+                );
+
+
+        hiloServidor.start();
+
+
+        // ---------------------------------------------------------
+        // ESPERAR A QUE EL SERVIDOR ABRA EL PUERTO
+        // ---------------------------------------------------------
+
+        try {
+
+            Thread.sleep(500);
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+        }
+
+
+        // ---------------------------------------------------------
+        // CONECTAR CLIENTE
+        // ---------------------------------------------------------
+
+        try {
+
+            cliente =
+                    new GameClient();
+
+
+            cliente.conectar();
+
+
+            JOptionPane.showMessageDialog(
+                    ventanaPrincipal,
+
+                    "¡Servidor iniciado correctamente!\n\n"
+                            + "El GameClient está conectado.",
+
+                    "Servidor iniciado",
+
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+
+        } catch (Exception e) {
+
+            JOptionPane.showMessageDialog(
+                    ventanaPrincipal,
+
+                    "El servidor se inició,\n"
+                            + "pero no se pudo conectar el GameClient.\n\n"
+                            + e.getMessage(),
+
+                    "Error de conexión",
+
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 
 
