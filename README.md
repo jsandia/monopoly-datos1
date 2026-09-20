@@ -20,6 +20,9 @@ de datos lineales propias y un cajero electrónico (dado + lector RFID).
 Requisitos: JDK instalado y Maven (viene con IntelliJ).
 
 ```bash
+# 0. Ver el tablero (por ahora, sin partida)
+mvn -q compile exec:java -Dexec.mainClass="cr.ac.tec.monopoly.cliente.VentanaTablero"
+
 # 1. Levantar el servidor (una sola máquina, la del organizador)
 mvn -q compile exec:java -Dexec.mainClass="cr.ac.tec.monopoly.servidor.Servidor"
 
@@ -27,7 +30,9 @@ mvn -q compile exec:java -Dexec.mainClass="cr.ac.tec.monopoly.servidor.Servidor"
 mvn -q compile exec:java -Dexec.mainClass="cr.ac.tec.monopoly.cliente.Cliente"
 ```
 
-> Todavía no existen esas clases. Este README se va llenando conforme avanza el proyecto.
+> Servidor y Cliente todavía no existen. Este README se va llenando conforme avanza el proyecto.
+
+Para correr las pruebas: `mvn test`.
 
 ## Estructura del repositorio
 
@@ -64,8 +69,9 @@ docs/              PROTOCOLO.md, UML, documento técnico
 
 - [x] Proyecto Maven creado y corriendo
 - [ ] Protocolo definido (`docs/PROTOCOLO.md`)
-- [ ] Estructuras de datos implementadas
-- [ ] Modelo del juego
+- [x] `ListaCircularDoble` (faltan `ColaCircular`, `ListaDoble`, `ListaSimple`)
+- [x] Tablero de 40 casillas (`Casilla`, `Propiedad`, `CasillaEvento`, `CasillaEspecial`, `Tablero`) con su ventana Swing
+- [ ] Resto del modelo (`Jugador`, `CartaEvento`, `Dado`, `Transaccion`)
 - [ ] Partida completa en consola, sin red
 - [ ] Servidor y clientes por sockets TCP
 - [ ] Interfaz Swing
