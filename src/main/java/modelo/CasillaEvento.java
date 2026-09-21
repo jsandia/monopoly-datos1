@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.modelo;
+package modelo;
 
 /**
  * Casilla donde el jugador toma una carta del mazo.

@@ -1,5 +1,7 @@
 package cr.ac.tec.monopoly.estructuras;
 
+import estructuras.ListaCircularDoble;
+import estructuras.Nodo;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

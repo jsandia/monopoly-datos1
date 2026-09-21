@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.modelo;
+package modelo;
 
 /**
  * Casillas que no se compran ni dan cartas: las cuatro esquinas y los impuestos.

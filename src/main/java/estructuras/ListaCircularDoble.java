@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.estructuras;
+package estructuras;
 
 /**
  * Lista circular doblemente enlazada.

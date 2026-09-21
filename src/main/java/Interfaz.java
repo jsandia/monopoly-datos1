@@ -1,4 +1,3 @@
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -48,8 +47,9 @@ public class Interfaz {
             cliente.conectar();
 
         } catch (Exception e) {
-            cliente=null;
-            
+
+            cliente = null;
+
         }
 
 
@@ -73,12 +73,14 @@ public class Interfaz {
                         100
                 );
 
+
         JButton añadirUsuario =
                 crearBotonImagen(
                         "imagenes/usuario.png",
                         150,
                         100
                 );
+
 
         JButton entrarPartida =
                 crearBotonImagen(
@@ -584,6 +586,17 @@ public class Interfaz {
                         JOptionPane.INFORMATION_MESSAGE
                 );
 
+                // =================================================
+                // ABRIR TABLERO
+                // =================================================
+
+                SwingUtilities.invokeLater(
+                        () -> new cliente.VentanaTablero().setVisible(true)
+                );
+
+                ventanaPrincipal.dispose();
+
+
             } else {
 
                 JOptionPane.showMessageDialog(
@@ -776,6 +789,17 @@ public class Interfaz {
 
                         JOptionPane.INFORMATION_MESSAGE
                 );
+
+                // =================================================
+                // ABRIR TABLERO
+                // =================================================
+
+                SwingUtilities.invokeLater(
+                        () -> new cliente.VentanaTablero().setVisible(true)
+                );
+
+                ventanaPrincipal.dispose();
+
 
             } else {
 

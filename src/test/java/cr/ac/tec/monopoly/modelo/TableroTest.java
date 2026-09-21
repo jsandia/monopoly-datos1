@@ -1,6 +1,7 @@
 package cr.ac.tec.monopoly.modelo;
 
-import cr.ac.tec.monopoly.estructuras.Nodo;
+import estructuras.Nodo;
+import modelo.*;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.estructuras;
+package estructuras;
 
 /**
  * Nodo de una lista doblemente enlazada.

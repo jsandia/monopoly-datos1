@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.modelo;
+package modelo;
 
 /**
  * Clase base de toda casilla del tablero.

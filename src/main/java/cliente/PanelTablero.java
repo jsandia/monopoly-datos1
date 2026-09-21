@@ -1,10 +1,10 @@
-package cr.ac.tec.monopoly.cliente;
+package cliente;
 
-import cr.ac.tec.monopoly.modelo.Casilla;
-import cr.ac.tec.monopoly.modelo.CasillaEspecial;
-import cr.ac.tec.monopoly.modelo.CasillaEvento;
-import cr.ac.tec.monopoly.modelo.Propiedad;
-import cr.ac.tec.monopoly.modelo.Tablero;
+import modelo.Casilla;
+import modelo.CasillaEspecial;
+import modelo.CasillaEvento;
+import modelo.Propiedad;
+import modelo.Tablero;
 
 import javax.swing.JPanel;
 import java.awt.BasicStroke;

@@ -1,4 +1,4 @@
-package cr.ac.tec.monopoly.modelo;
+package modelo;
 
 /**
  * Casilla que se puede comprar.

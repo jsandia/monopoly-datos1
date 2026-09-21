@@ -1,7 +1,7 @@
-package cr.ac.tec.monopoly.modelo;
+package modelo;
 
-import cr.ac.tec.monopoly.estructuras.ListaCircularDoble;
-import cr.ac.tec.monopoly.estructuras.Nodo;
+import estructuras.ListaCircularDoble;
+import estructuras.Nodo;
 
 /**
  * El tablero: 40 casillas en una lista circular doblemente enlazada,
