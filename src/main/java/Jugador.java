@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 /**
  * Clase Jugador
  * Representa un jugador como participante del Juego.
@@ -13,6 +15,9 @@ public class Jugador {
     private int posicionActual;
     private boolean activo;
 
+    // Lista de propiedades que posee el jugador
+    private ArrayList<Propiedad> propiedades;
+
     //Agregar atributo de La lista de propiedades cuando este listo.
 
     /**
@@ -25,6 +30,9 @@ public class Jugador {
         this.saldo = saldoInicial;
         this.posicionActual = 0;
         this.activo = true;
+
+        // Inicializar la lista de propiedades
+        this.propiedades = new ArrayList<>();
     }
 
     // --- Métodos de gestión de dinero ---
@@ -67,6 +75,61 @@ public class Jugador {
                         % totalCasillasTablero;
     }
 
+    // --- Métodos de gestión de propiedades ---
+
+    /**
+     * Agrega una propiedad a la lista de propiedades del jugador.
+     */
+    public void agregarPropiedad(Propiedad propiedad) {
+
+        if (propiedad != null && !propiedades.contains(propiedad)) {
+            propiedades.add(propiedad);
+        }
+    }
+
+    /**
+     * Elimina una propiedad de la lista del jugador.
+     */
+    public void quitarPropiedad(Propiedad propiedad) {
+
+        if (propiedad != null) {
+            propiedades.remove(propiedad);
+        }
+    }
+
+    /**
+     * Devuelve la lista de propiedades del jugador.
+     */
+    public ArrayList<Propiedad> getPropiedades() {
+
+        return propiedades;
+    }
+
+    /**
+     * Calcula el valor total de compra
+     * de todas las propiedades del jugador.
+     */
+    public int calcularValorPropiedades() {
+
+        int total = 0;
+
+        for (Propiedad propiedad : propiedades) {
+            total += propiedad.getPrecioCompra();
+        }
+
+        return total;
+    }
+
+    /**
+     * Calcula el patrimonio total del jugador.
+     *
+     * Patrimonio = dinero + valor de las propiedades.
+     */
+    public int calcularPatrimonio() {
+
+        return saldo + calcularValorPropiedades();
+    }
+
     // --- Getters y Setters Básicos ---
 
     public String getId() {
@@ -101,5 +164,13 @@ public class Jugador {
         this.activo = activo;
     }
 
-    // Agregar un metodo de calcularPropiedades/Patrimonio.
+    // --- Métodos adicionales de propiedades ---
+
+    /**
+     * Devuelve la cantidad de propiedades que posee el jugador.
+     */
+    public int getCantidadPropiedades() {
+
+        return propiedades.size();
+    }
 }
