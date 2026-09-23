@@ -3,6 +3,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.*;
+import cliente.VentanaTablero;
 
 public class Interfaz {
 
@@ -587,11 +588,14 @@ public class Interfaz {
                 );
 
                 // =================================================
-                // ABRIR TABLERO
+                // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
                 // =================================================
 
+                String j1 = nombreJugador1;
+                String j2 = nombreJugador2;
+
                 SwingUtilities.invokeLater(
-                        () -> new cliente.VentanaTablero().setVisible(true)
+                        () -> new cliente.VentanaTablero(j1, j2).setVisible(true)
                 );
 
                 ventanaPrincipal.dispose();
@@ -791,11 +795,14 @@ public class Interfaz {
                 );
 
                 // =================================================
-                // ABRIR TABLERO
+                // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
                 // =================================================
 
+                String j1 = nombreJugador1;
+                String j2 = nombreJugador2;
+
                 SwingUtilities.invokeLater(
-                        () -> new cliente.VentanaTablero().setVisible(true)
+                        () -> new cliente.VentanaTablero(j1, j2).setVisible(true)
                 );
 
                 ventanaPrincipal.dispose();

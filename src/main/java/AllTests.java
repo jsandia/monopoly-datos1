@@ -1,225 +1,786 @@
-import java.io.*;
-import java.net.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import modelo.Jugador;
+import modelo.Propiedad;
 
 /**
- * Suite de pruebas en Java puro (sin JUnit) para no depender de
- * descargar nada de internet. Corré con:
+ * Clase Banco
  *
- *   javac --release 26 *.java
- *   java AllTests
+ * Representa el banco del juego Monopoly CR.
  *
- * Si algo falla, imprime FAIL con el detalle; si todo pasa, termina
- * con "TODAS LAS PRUEBAS PASARON".
+ * El banco administra:
+ *
+ * - Dinero
+ * - Casas
+ * - Hoteles
+ * - Compra de propiedades
+ * - Alquileres
+ * - Impuestos
+ * - Pago por pasar por la salida
+ * - Compra y venta de casas
+ * - Compra y venta de hoteles
+ * - Hipotecas
+ * - Cancelación de hipotecas
  */
-public class AllTests {
+ class Banco {
 
-    private static int passed = 0;
-    private static int failed = 0;
+    // =========================================================
+    // ATRIBUTOS
+    // =========================================================
 
-    public static void main(String[] args) throws Exception {
-        System.setOut(new PrintStream(System.out, true, "UTF-8"));
+    private int saldo;
 
-        run("Serialización de Message.PlayerMove", AllTests::testPlayerMoveSerialization);
-        run("Serialización de Message.GameState", AllTests::testGameStateSerialization);
-        run("Igualdad de records (equals/hashCode)", AllTests::testRecordEquality);
-        // Esta va antes que las de GameServer: todas usan el mismo puerto UDP
-        // fijo de descubrimiento (5001), así que si un GameServer de otra
-        // prueba ya lo tiene tomado, esta prueba se ve afectada sin motivo.
-        run("Descubrimiento por broadcast (host + client en localhost)", AllTests::testDiscoveryRoundTrip);
-        run("Servidor + 2 clientes en localhost (integración)", AllTests::testServerClientIntegration);
-        run("Servidor sigue funcionando si un jugador se desconecta", AllTests::testServerSurvivesClientDisconnect);
+    // Cantidad de casas que tiene disponibles el banco.
+    private int casasDisponibles;
 
-        System.out.println();
-        System.out.println("Resultado: " + passed + " pasaron, " + failed + " fallaron");
-        if (failed > 0) {
-            System.out.println("HAY ERRORES — revisá el detalle arriba.");
-            System.exit(1);
-        } else {
-            System.out.println("TODAS LAS PRUEBAS PASARON.");
-        }
-    }
+    // Cantidad de hoteles que tiene disponibles el banco.
+    private int hotelesDisponibles;
 
-    // ---------- infraestructura mínima de test ----------
 
-    private interface TestCase { void run() throws Exception; }
-
-    private static void run(String name, TestCase test) {
-        try {
-            test.run();
-            System.out.println("PASS - " + name);
-            passed++;
-        } catch (Throwable t) {
-            System.out.println("FAIL - " + name);
-            System.out.println("       " + t);
-            failed++;
-        }
-    }
-
-    private static void assertTrue(boolean condition, String message) {
-        if (!condition) throw new AssertionError(message);
-    }
-
-    private static void assertEquals(Object expected, Object actual, String message) {
-        if (!java.util.Objects.equals(expected, actual)) {
-            throw new AssertionError(message + " — esperado: " + expected + ", obtenido: " + actual);
-        }
-    }
-
-    // ---------- pruebas de Message (serialización) ----------
-
-    private static byte[] serialize(Object o) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
-            oos.writeObject(o);
-        }
-        return bos.toByteArray();
-    }
-
-    private static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
-        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data))) {
-            return ois.readObject();
-        }
-    }
-
-    private static void testPlayerMoveSerialization() throws Exception {
-        Message.PlayerMove original = new Message.PlayerMove(1, 3.5, 7.25, "move");
-        Message.PlayerMove copy = (Message.PlayerMove) deserialize(serialize(original));
-
-        assertEquals(original.playerId(), copy.playerId(), "playerId no sobrevivió la serialización");
-        assertEquals(original.x(), copy.x(), "x no sobrevivió la serialización");
-        assertEquals(original.y(), copy.y(), "y no sobrevivió la serialización");
-        assertEquals(original.action(), copy.action(), "action no sobrevivió la serialización");
-    }
-
-    private static void testGameStateSerialization() throws Exception {
-        Message.GameState original = new Message.GameState(1, 2, 3, 4, 10, 20);
-        Message.GameState copy = (Message.GameState) deserialize(serialize(original));
-        assertEquals(original, copy, "GameState no es igual tras serializar/deserializar");
-    }
-
-    private static void testRecordEquality() {
-        Message.Ping a = new Message.Ping(12345L);
-        Message.Ping b = new Message.Ping(12345L);
-        Message.Ping c = new Message.Ping(99999L);
-        assertTrue(a.equals(b), "dos Ping con el mismo timestamp deberían ser iguales");
-        assertTrue(!a.equals(c), "dos Ping con distinto timestamp NO deberían ser iguales");
-    }
-
-    // ---------- integración: GameServer + clientes reales por socket ----------
+    // =========================================================
+    // CONSTRUCTOR
+    // =========================================================
 
     /**
-     * Simula lo que hace GameClient, pero sin Scanner ni System.out,
-     * para poder controlarlo desde el test.
+     * Crea un banco con los valores iniciales del juego.
+     *
+     * Dinero: ₡1.000.000
+     * Casas: 32
+     * Hoteles: 12
      */
-    private record RawClient(Socket socket, ObjectOutputStream out, ObjectInputStream in) implements Closeable {
-        static RawClient connect(int port) throws IOException {
-            Socket socket = new Socket("127.0.0.1", port);
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-            return new RawClient(socket, out, in);
-        }
-        public void close() throws IOException { socket.close(); }
+    public Banco() {
+
+        this.saldo = 1_000_000;
+        this.casasDisponibles = 32;
+        this.hotelesDisponibles = 12;
     }
 
-    private static void testServerClientIntegration() throws Exception {
-        int testPort = 15000; // puerto alto para no chocar con el de producción (5000)
-        GameServer server = new GameServer(testPort);
-        Thread serverThread = new Thread(() -> {
-            try { server.start(); } catch (Exception ignored) {}
-        });
-        serverThread.setDaemon(true);
-        serverThread.start();
 
-        Thread.sleep(200); // darle tiempo al server a abrir el ServerSocket
+    /**
+     * Constructor para crear un banco
+     * con cantidades personalizadas.
+     */
+    public Banco(
+            int saldoInicial,
+            int casasIniciales,
+            int hotelesIniciales
+    ) {
 
-        try (RawClient p0 = RawClient.connect(testPort);
-             RawClient p1 = RawClient.connect(testPort)) {
+        if (saldoInicial >= 0) {
+            this.saldo = saldoInicial;
+        } else {
+            this.saldo = 0;
+        }
 
-            Message.Welcome w0 = (Message.Welcome) p0.in().readObject();
-            Message.Welcome w1 = (Message.Welcome) p1.in().readObject();
-            assertEquals(0, w0.playerId(), "primer cliente debería recibir playerId 0");
-            assertEquals(1, w1.playerId(), "segundo cliente debería recibir playerId 1");
+        if (casasIniciales >= 0) {
+            this.casasDisponibles = casasIniciales;
+        } else {
+            this.casasDisponibles = 0;
+        }
 
-            // Jugador 0 se mueve
-            p0.out().writeObject(new Message.PlayerMove(0, 5.0, 6.0, "move"));
-            p0.out().flush();
-
-            // Ambos clientes deberían recibir el GameState actualizado
-            Message.GameState state0 = (Message.GameState) p0.in().readObject();
-            Message.GameState state1 = (Message.GameState) p1.in().readObject();
-
-            assertEquals(5.0, state0.p0x(), "el estado que recibe el jugador 0 no refleja su propio movimiento (x)");
-            assertEquals(6.0, state0.p0y(), "el estado que recibe el jugador 0 no refleja su propio movimiento (y)");
-            assertEquals(state0, state1, "los dos jugadores deberían recibir exactamente el mismo estado");
+        if (hotelesIniciales >= 0) {
+            this.hotelesDisponibles = hotelesIniciales;
+        } else {
+            this.hotelesDisponibles = 0;
         }
     }
 
-    private static void testServerSurvivesClientDisconnect() throws Exception {
-        int testPort = 15001;
-        GameServer server = new GameServer(testPort);
-        Thread serverThread = new Thread(() -> {
-            try { server.start(); } catch (Exception ignored) {}
-        });
-        serverThread.setDaemon(true);
-        serverThread.start();
-        Thread.sleep(200);
 
-        RawClient p0 = RawClient.connect(testPort);
-        p0.in().readObject(); // Welcome
+    // =========================================================
+    // GETTERS
+    // =========================================================
 
-        try (RawClient p1 = RawClient.connect(testPort)) {
-            p1.in().readObject(); // Welcome
+    /**
+     * Devuelve el dinero disponible del banco.
+     */
+    public int getSaldo() {
+        return saldo;
+    }
 
-            p0.close(); // el jugador 0 se desconecta a la fuerza
 
-            // el jugador 1 sigue pudiendo moverse sin que el servidor explote
-            p1.out().writeObject(new Message.PlayerMove(1, 1.0, 1.0, "move"));
-            p1.out().flush();
+    /**
+     * Devuelve la cantidad de casas disponibles.
+     */
+    public int getCasasDisponibles() {
+        return casasDisponibles;
+    }
 
-            // El próximo mensaje puede ser el GameState de nuestro propio
-            // movimiento, o el aviso PlayerDisconnected del jugador 0 —
-            // el orden no está garantizado (es una carrera real de red),
-            // así que leemos hasta encontrar el GameState, igual que hace
-            // GameClient de verdad con su switch.
-            Message.GameState state = readUntilGameState(p1, 5);
-            assertEquals(1.0, state.p1x(), "el servidor debería seguir funcionando para el jugador que queda conectado");
+
+    /**
+     * Devuelve la cantidad de hoteles disponibles.
+     */
+    public int getHotelesDisponibles() {
+        return hotelesDisponibles;
+    }
+
+
+    // =========================================================
+    // DINERO DEL BANCO
+    // =========================================================
+
+    /**
+     * Hace que el banco reciba dinero.
+     */
+    public void recibirDinero(int monto) {
+
+        if (monto > 0) {
+            saldo += monto;
         }
     }
 
-    private static Message.GameState readUntilGameState(RawClient client, int maxMessages) throws Exception {
-        for (int i = 0; i < maxMessages; i++) {
-            Message msg = (Message) client.in().readObject();
-            if (msg instanceof Message.GameState state) return state;
+
+    /**
+     * Hace que el banco entregue dinero.
+     *
+     * Retorna true si pudo entregar el dinero.
+     * Retorna false si el monto es inválido
+     * o el banco no tiene suficiente.
+     */
+    public boolean entregarDinero(int monto) {
+
+        if (monto <= 0) {
+            return false;
         }
-        throw new AssertionError("no llegó ningún GameState después de " + maxMessages + " mensajes");
+
+        if (monto > saldo) {
+            return false;
+        }
+
+        saldo -= monto;
+
+        return true;
     }
 
-    // ---------- descubrimiento (UDP broadcast) ----------
 
-    private static void testDiscoveryRoundTrip() throws Exception {
-        int testPort = 15002;
-        AtomicBoolean announced = new AtomicBoolean(false);
+    // =========================================================
+    // PAGAR A JUGADOR
+    // =========================================================
 
-        Thread announcer = new Thread(() -> {
-            announced.set(true);
-            Discovery.hostAnnounce(testPort);
-        });
-        announcer.setDaemon(true);
-        announcer.start();
-        Thread.sleep(300);
-        assertTrue(announced.get(), "el hilo de anuncio no llegó a arrancar");
+    /**
+     * El banco paga dinero a un jugador.
+     */
+    public boolean pagarJugador(
+            Jugador jugador,
+            int monto
+    ) {
 
-        try {
-            Discovery.HostInfo info = Discovery.discoverHost(3000);
-            assertEquals(testPort, info.port(), "el puerto descubierto no coincide con el anunciado");
-        } catch (IOException e) {
-            // En algunos entornos en la nube (contenedores sin interfaz de
-            // broadcast real) el UDP broadcast no llega ni siquiera a uno
-            // mismo. Esto NO es un bug del código: en una red WiFi real
-            // (como la que van a usar las 2 computadoras) sí funciona.
-            // Lo dejamos como aviso, no como fallo duro de la prueba.
-            System.out.println("       (aviso: broadcast no disponible en este entorno, no es un error del código: " + e.getMessage() + ")");
+        if (jugador == null) {
+            return false;
         }
+
+        if (monto <= 0) {
+            return false;
+        }
+
+        if (!entregarDinero(monto)) {
+            return false;
+        }
+
+        jugador.acreditar(monto);
+
+        return true;
+    }
+
+
+    // =========================================================
+    // COBRAR A JUGADOR
+    // =========================================================
+
+    /**
+     * El banco cobra dinero a un jugador.
+     */
+    public boolean cobrarJugador(
+            Jugador jugador,
+            int monto
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (monto <= 0) {
+            return false;
+        }
+
+        if (!jugador.debitar(monto)) {
+            return false;
+        }
+
+        recibirDinero(monto);
+
+        return true;
+    }
+
+
+    // =========================================================
+    // SALIDA
+    // =========================================================
+
+    /**
+     * Paga al jugador cuando pasa por la casilla de salida.
+     */
+    public boolean pagarSalida(
+            Jugador jugador,
+            int monto
+    ) {
+
+        return pagarJugador(jugador, monto);
+    }
+
+
+    // =========================================================
+    // IMPUESTOS
+    // =========================================================
+
+    /**
+     * Cobra un impuesto al jugador.
+     */
+    public boolean cobrarImpuesto(
+            Jugador jugador,
+            int impuesto
+    ) {
+
+        return cobrarJugador(jugador, impuesto);
+    }
+
+
+    // =========================================================
+    // COMPRA DE PROPIEDAD
+    // =========================================================
+
+    /**
+     * Permite que un jugador compre una propiedad.
+     *
+     * La propiedad debe estar libre.
+     */
+    public boolean comprarPropiedad(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // La propiedad ya tiene dueño.
+        if (propiedad.tienePropietario()) {
+            return false;
+        }
+
+        int precio = propiedad.getPrecioCompra();
+
+        if (precio <= 0) {
+            return false;
+        }
+
+        // El jugador debe tener suficiente dinero.
+        if (!jugador.debitar(precio)) {
+            return false;
+        }
+
+        // El banco recibe el dinero.
+        recibirDinero(precio);
+
+        // Se asigna el dueño.
+        propiedad.setPropietario(jugador);
+
+        // Se agrega la propiedad al jugador.
+        jugador.agregarPropiedad(propiedad);
+
+        return true;
+    }
+
+
+    // =========================================================
+    // COBRAR ALQUILER
+    // =========================================================
+
+    /**
+     * Cobra el alquiler cuando un jugador
+     * cae en la propiedad de otro jugador.
+     */
+    public boolean cobrarAlquiler(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        Jugador propietario =
+                propiedad.getPropietario();
+
+        // La propiedad no tiene dueño.
+        if (propietario == null) {
+            return false;
+        }
+
+        // El jugador cayó en su propia propiedad.
+        if (propietario == jugador) {
+            return false;
+        }
+
+        // Una propiedad hipotecada no cobra alquiler.
+        if (propiedad.estaHipotecada()) {
+            return false;
+        }
+
+        int alquiler =
+                propiedad.calcularAlquiler();
+
+        if (alquiler <= 0) {
+            return false;
+        }
+
+        // El jugador debe poder pagar.
+        if (!jugador.debitar(alquiler)) {
+            return false;
+        }
+
+        // El dueño recibe el alquiler.
+        propietario.acreditar(alquiler);
+
+        return true;
+    }
+
+
+    // =========================================================
+    // COMPRAR CASA
+    // =========================================================
+
+    /**
+     * Permite que un jugador compre una casa.
+     */
+    public boolean comprarCasa(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // El jugador debe ser el dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // No se puede construir sobre una propiedad hipotecada.
+        if (propiedad.estaHipotecada()) {
+            return false;
+        }
+
+        // No se pueden construir casas si ya existe hotel.
+        if (propiedad.tieneHotel()) {
+            return false;
+        }
+
+        // Máximo 4 casas.
+        if (propiedad.getCantidadCasas() >= 4) {
+            return false;
+        }
+
+        // El banco debe tener casas disponibles.
+        if (casasDisponibles <= 0) {
+            return false;
+        }
+
+        int precio =
+                propiedad.getPrecioCasa();
+
+        if (precio <= 0) {
+            return false;
+        }
+
+        // Primero comprobamos si puede pagar.
+        if (jugador.getSaldo() < precio) {
+            return false;
+        }
+
+        // Quitamos el dinero.
+        if (!jugador.debitar(precio)) {
+            return false;
+        }
+
+        // Intentamos construir la casa.
+        if (!propiedad.agregarCasa()) {
+
+            // Si falla, devolvemos el dinero.
+            jugador.acreditar(precio);
+
+            return false;
+        }
+
+        // El banco recibe el dinero.
+        recibirDinero(precio);
+
+        // El banco entrega una casa.
+        casasDisponibles--;
+
+        return true;
+    }
+
+
+    // =========================================================
+    // VENDER CASA
+    // =========================================================
+
+    /**
+     * El jugador vende una casa al banco.
+     *
+     * Recibe la mitad del precio de compra.
+     */
+    public boolean venderCasa(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // Debe ser dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // Debe tener al menos una casa.
+        if (propiedad.getCantidadCasas() <= 0) {
+            return false;
+        }
+
+        int precioVenta =
+                propiedad.getPrecioCasa() / 2;
+
+        if (precioVenta <= 0) {
+            return false;
+        }
+
+        // El banco debe tener dinero para pagar.
+        if (!entregarDinero(precioVenta)) {
+            return false;
+        }
+
+        // Quitamos la casa.
+        if (!propiedad.quitarCasa()) {
+
+            // Si falla, devolvemos el dinero al banco.
+            recibirDinero(precioVenta);
+
+            return false;
+        }
+
+        // El jugador recibe el dinero.
+        jugador.acreditar(precioVenta);
+
+        // La casa vuelve al banco.
+        casasDisponibles++;
+
+        return true;
+    }
+
+
+    // =========================================================
+    // COMPRAR HOTEL
+    // =========================================================
+
+    /**
+     * Permite que un jugador compre un hotel.
+     *
+     * Para construirlo debe tener exactamente
+     * cuatro casas.
+     */
+    public boolean comprarHotel(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // Debe ser dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // No se puede construir sobre una propiedad hipotecada.
+        if (propiedad.estaHipotecada()) {
+            return false;
+        }
+
+        // Ya tiene hotel.
+        if (propiedad.tieneHotel()) {
+            return false;
+        }
+
+        // Necesita exactamente 4 casas.
+        if (propiedad.getCantidadCasas() != 4) {
+            return false;
+        }
+
+        // Debe haber hoteles disponibles.
+        if (hotelesDisponibles <= 0) {
+            return false;
+        }
+
+        int precio =
+                propiedad.getPrecioHotel();
+
+        if (precio <= 0) {
+            return false;
+        }
+
+        // El jugador debe poder pagar.
+        if (!jugador.debitar(precio)) {
+            return false;
+        }
+
+        // Construimos el hotel.
+        if (!propiedad.construirHotel()) {
+
+            // Si falla, devolvemos el dinero.
+            jugador.acreditar(precio);
+
+            return false;
+        }
+
+        // El banco recibe el dinero.
+        recibirDinero(precio);
+
+        /*
+         * El banco entrega un hotel.
+         */
+        hotelesDisponibles--;
+
+        /*
+         * Las cuatro casas que tenía la propiedad
+         * regresan al banco.
+         */
+        casasDisponibles += 4;
+
+        return true;
+    }
+
+
+    // =========================================================
+    // VENDER HOTEL
+    // =========================================================
+
+    /**
+     * El jugador vende un hotel al banco.
+     *
+     * Recibe la mitad del precio del hotel.
+     */
+    public boolean venderHotel(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // Debe ser dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // Debe tener hotel.
+        if (!propiedad.tieneHotel()) {
+            return false;
+        }
+
+        int precioVenta =
+                propiedad.getPrecioHotel() / 2;
+
+        if (precioVenta <= 0) {
+            return false;
+        }
+
+        // El banco debe poder pagar.
+        if (!entregarDinero(precioVenta)) {
+            return false;
+        }
+
+        // Quitamos el hotel.
+        if (!propiedad.quitarHotel()) {
+
+            // Devolvemos el dinero al banco.
+            recibirDinero(precioVenta);
+
+            return false;
+        }
+
+        // El jugador recibe el dinero.
+        jugador.acreditar(precioVenta);
+
+        // El hotel vuelve al banco.
+        hotelesDisponibles++;
+
+        return true;
+    }
+
+
+    // =========================================================
+    // HIPOTECAR PROPIEDAD
+    // =========================================================
+
+    /**
+     * Hipoteca una propiedad.
+     *
+     * El banco paga al jugador el valor
+     * establecido para la hipoteca.
+     */
+    public boolean hipotecarPropiedad(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // Debe ser dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // Ya está hipotecada.
+        if (propiedad.estaHipotecada()) {
+            return false;
+        }
+
+        // No se puede hipotecar con casas.
+        if (propiedad.getCantidadCasas() > 0) {
+            return false;
+        }
+
+        // No se puede hipotecar con hotel.
+        if (propiedad.tieneHotel()) {
+            return false;
+        }
+
+        int valorHipoteca =
+                propiedad.getValorHipoteca();
+
+        if (valorHipoteca <= 0) {
+            return false;
+        }
+
+        // El banco debe tener suficiente dinero.
+        if (!entregarDinero(valorHipoteca)) {
+            return false;
+        }
+
+        // Marcamos la propiedad como hipotecada.
+        if (!propiedad.hipotecar()) {
+
+            // Devolvemos el dinero al banco.
+            recibirDinero(valorHipoteca);
+
+            return false;
+        }
+
+        // El jugador recibe el dinero.
+        jugador.acreditar(valorHipoteca);
+
+        return true;
+    }
+
+
+    // =========================================================
+    // QUITAR HIPOTECA
+    // =========================================================
+
+    /**
+     * Quita la hipoteca de una propiedad.
+     *
+     * El jugador paga:
+     *
+     * valor de hipoteca + 10% de interés.
+     */
+    public boolean quitarHipoteca(
+            Jugador jugador,
+            Propiedad propiedad
+    ) {
+
+        if (jugador == null) {
+            return false;
+        }
+
+        if (propiedad == null) {
+            return false;
+        }
+
+        // Debe ser dueño.
+        if (propiedad.getPropietario() != jugador) {
+            return false;
+        }
+
+        // Debe estar hipotecada.
+        if (!propiedad.estaHipotecada()) {
+            return false;
+        }
+
+        int valorHipoteca =
+                propiedad.getValorHipoteca();
+
+        if (valorHipoteca <= 0) {
+            return false;
+        }
+
+        // 10% de interés.
+        int interes =
+                valorHipoteca / 10;
+
+        int montoTotal =
+                valorHipoteca + interes;
+
+        // El jugador debe poder pagar.
+        if (!jugador.debitar(montoTotal)) {
+            return false;
+        }
+
+        // Quitamos la hipoteca.
+        if (!propiedad.quitarHipoteca()) {
+
+            // Si falla, devolvemos el dinero.
+            jugador.acreditar(montoTotal);
+
+            return false;
+        }
+
+        // El banco recibe el pago.
+        recibirDinero(montoTotal);
+
+        return true;
     }
 }

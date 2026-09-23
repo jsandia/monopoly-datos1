@@ -1,3 +1,5 @@
+import modelo.Jugador;
+
 /**
  * Clase Propiedad
  *
