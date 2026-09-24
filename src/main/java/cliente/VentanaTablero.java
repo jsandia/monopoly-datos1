@@ -17,10 +17,12 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.util.Random;
 
 /**
  * La ventana (JFrame) que muestra el tablero. Solo arma las piezas:
@@ -49,6 +51,11 @@ public class VentanaTablero extends JFrame {
     private PanelTablero panelTablero;
     private Tablero modeloTablero;
     private boolean yaLanzados = false;
+
+    // --- Animación de los dados ---
+    private static final int DURACION_ANIMACION_MS = 2000; // cuánto giran antes de mostrar el número final
+    private static final int INTERVALO_ANIMACION_MS = 80;  // cada cuánto cambia la cara mientras gira
+    private final Random random = new Random();
 
     public VentanaTablero() {
         this("Jugador 1", "Jugador 2");
@@ -160,34 +167,80 @@ public class VentanaTablero extends JFrame {
         return "";
     }
 
-    private void configurarEventosBotones() {
-        botonLanzarDados.addActionListener(e -> {
-            if (yaLanzados) return;
+    /**
+     * Se llama al hacer clic en "Lanzar Dados". No mueve al jugador todavía:
+     * primero hace girar los dados en el tablero (números al azar, solo
+     * visuales) durante DURACION_ANIMACION_MS, y recién cuando termina
+     * llama a finalizarLanzamiento(), que ahí sí tira los dados de verdad
+     * y mueve la ficha.
+     *
+     * Usa javax.swing.Timer (no java.util.Timer): sus eventos se disparan
+     * en el hilo de Swing, así que es seguro tocar los componentes de la
+     * interfaz directamente desde adentro, sin SwingUtilities.invokeLater.
+     */
+    private void lanzarDadosConAnimacion() {
+        if (yaLanzados) return;
 
-            int[] dados = juego.lanzarDadosSoftware();
-            int total = dados[0] + dados[1];
+        botonLanzarDados.setEnabled(false); // evita doble clic mientras giran los dados
 
-            Jugador actual = juego.getJugadorActual();
-            juego.ejecutarMovimientoJugadorActual(total);
+        long inicioAnimacion = System.currentTimeMillis();
 
-            registrarLog(actual.getNombre() + " sacó [" + dados[0] + "][" + dados[1] + "] = " + total);
+        Timer temporizador = new Timer(INTERVALO_ANIMACION_MS, null);
+        temporizador.addActionListener(evento -> {
+            long transcurrido = System.currentTimeMillis() - inicioAnimacion;
 
-            Casilla casillaActual = modeloTablero.obtenerCasilla(actual.getPosicionActual());
-            mostrarCasilla(casillaActual);
-
-            if (casillaActual instanceof Propiedad p && !p.tienePropietario()) {
-                botonComprar.setEnabled(true);
-            } else {
-                botonComprar.setEnabled(false);
+            if (transcurrido >= DURACION_ANIMACION_MS) {
+                temporizador.stop();
+                finalizarLanzamiento();
+                return;
             }
 
-            yaLanzados = true;
-            botonLanzarDados.setEnabled(false);
-            botonTerminarTurno.setEnabled(true);
-
-            actualizarEstadoJugador();
+            // Mientras gira: caras al azar solo para el efecto visual,
+            // todavía no es el resultado real del turno.
+            int caraAlAzar1 = 1 + random.nextInt(6);
+            int caraAlAzar2 = 1 + random.nextInt(6);
+            panelTablero.mostrarDados(caraAlAzar1, caraAlAzar2);
             panelTablero.repaint();
         });
+        temporizador.start();
+    }
+
+    /**
+     * Tira los dados de verdad (los que cuentan para el juego), mueve al
+     * jugador y deja esos números finales dibujados en el tablero. Es
+     * exactamente lo que antes hacía directamente el botón, solo que ahora
+     * se ejecuta después de la animación en vez de al instante.
+     */
+    private void finalizarLanzamiento() {
+        int[] dados = juego.lanzarDadosSoftware();
+        int total = dados[0] + dados[1];
+
+        panelTablero.mostrarDados(dados[0], dados[1]); // números finales, ya no al azar
+
+        Jugador actual = juego.getJugadorActual();
+        juego.ejecutarMovimientoJugadorActual(total);
+
+        registrarLog(actual.getNombre() + " sacó [" + dados[0] + "][" + dados[1] + "] = " + total);
+
+        Casilla casillaActual = modeloTablero.obtenerCasilla(actual.getPosicionActual());
+        mostrarCasilla(casillaActual);
+
+        if (casillaActual instanceof Propiedad p && !p.tienePropietario()) {
+            botonComprar.setEnabled(true);
+        } else {
+            botonComprar.setEnabled(false);
+        }
+
+        yaLanzados = true;
+        botonTerminarTurno.setEnabled(true);
+        // botonLanzarDados se vuelve a habilitar en botonTerminarTurno, para el próximo turno
+
+        actualizarEstadoJugador();
+        panelTablero.repaint();
+    }
+
+    private void configurarEventosBotones() {
+        botonLanzarDados.addActionListener(e -> lanzarDadosConAnimacion());
 
         botonComprar.addActionListener(e -> {
             Jugador actual = juego.getJugadorActual();
@@ -220,10 +273,12 @@ public class VentanaTablero extends JFrame {
             botonLanzarDados.setEnabled(true);
             botonComprar.setEnabled(false);
             botonTerminarTurno.setEnabled(false);
+            panelTablero.ocultarDados();
 
             Jugador siguiente = juego.getJugadorActual();
             registrarLog("Turno de " + siguiente.getNombre());
             actualizarEstadoJugador();
+            panelTablero.repaint();
         });
     }
 

@@ -45,6 +45,11 @@ public class PanelTablero extends JPanel {
     private final Rectangle[] rectangulos = new Rectangle[40];
     private Casilla seleccionada;
 
+    // Estado de los dados dibujados sobre el tablero (ver mostrarDados/ocultarDados)
+    private int dado1 = 1;
+    private int dado2 = 1;
+    private boolean mostrandoDados = false;
+
     // "Callback": quien use este panel registra aquí qué hacer cuando hay clic
     // en una casilla. Por defecto no hace nada (c -> { }) para evitar un null.
     private Consumer<Casilla> alSeleccionar = c -> { };
@@ -73,6 +78,22 @@ public class PanelTablero extends JPanel {
         this.alSeleccionar = alSeleccionar;
     }
 
+    /**
+     * Actualiza los números de los dados y hace que se dibujen sobre el
+     * tablero (centro). Quien llama a esto todavía tiene que pedir
+     * repaint() para que el cambio se vea en pantalla.
+     */
+    public void mostrarDados(int dado1, int dado2) {
+        this.dado1 = dado1;
+        this.dado2 = dado2;
+        this.mostrandoDados = true;
+    }
+
+    /** Deja de dibujar los dados (por ejemplo, al empezar el turno de otro jugador). */
+    public void ocultarDados() {
+        this.mostrandoDados = false;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g); // limpia el fondo; sin esto quedan restos del dibujo anterior
@@ -91,6 +112,10 @@ public class PanelTablero extends JPanel {
         g2.setColor(FONDO);
         g2.fillRect(x0, y0, lado, lado);
         dibujarCentro(g2, x0, y0, lado, c);
+
+        if (mostrandoDados) {
+            dibujarDados(g2, x0, y0, lado, c);
+        }
 
         for (int i = 0; i < 40; i++) {
             rectangulos[i] = rectanguloDe(i, x0, y0, w, c);
@@ -278,6 +303,91 @@ public class PanelTablero extends JPanel {
         dibujarTexto(g2, "COSTA RICA",
                 new Rectangle(cx - anchoSub / 2, cy + 8, anchoSub, altoSub),
                 new Font("SansSerif", Font.BOLD, (int) (altoSub * 0.55)), new Color(0xFFF3D6));
+    }
+
+    /**
+     * Dibuja los 2 dados justo debajo del cartel "COSTA RICA", en el
+     * centro del tablero. Se llama solo cuando mostrandoDados es true
+     * (ver mostrarDados/ocultarDados).
+     */
+    private void dibujarDados(Graphics2D g2, int x0, int y0, int lado, double c) {
+        int cx = x0 + lado / 2;
+        int cy = y0 + lado / 2;
+        int altoBanner = (int) (lado * 0.11);
+        int altoSub = (int) (altoBanner * 0.55);
+
+        int tamanoDado = (int) (altoBanner * 0.85);
+        int espacio = (int) (tamanoDado * 0.35);
+        int anchoTotal = tamanoDado * 2 + espacio;
+
+        int dadosY = cy + 8 + altoSub + 12;
+        int dado1X = cx - anchoTotal / 2;
+        int dado2X = dado1X + tamanoDado + espacio;
+
+        dibujarUnDado(g2, dado1X, dadosY, tamanoDado, dado1);
+        dibujarUnDado(g2, dado2X, dadosY, tamanoDado, dado2);
+    }
+
+    /** Dibuja un solo dado (cuadrado blanco con puntos negros) en la posición dada. */
+    private void dibujarUnDado(Graphics2D g2, int x, int y, int tamano, int valor) {
+        int radioEsquina = tamano / 5;
+
+        g2.setColor(Color.WHITE);
+        g2.fillRoundRect(x, y, tamano, tamano, radioEsquina, radioEsquina);
+        g2.setColor(BORDE);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(x, y, tamano, tamano, radioEsquina, radioEsquina);
+
+        int pad = tamano / 5;
+        int izq = x + pad;
+        int der = x + tamano - pad;
+        int arriba = y + pad;
+        int abajo = y + tamano - pad;
+        int medioX = x + tamano / 2;
+        int medioY = y + tamano / 2;
+        int radioPunto = Math.max(3, tamano / 9);
+
+        g2.setColor(new Color(0x1B1B1B));
+
+        // Patrón de puntos clásico de un dado, según el valor (1 a 6)
+        switch (valor) {
+            case 1 -> dibujarPunto(g2, medioX, medioY, radioPunto);
+            case 2 -> {
+                dibujarPunto(g2, izq, arriba, radioPunto);
+                dibujarPunto(g2, der, abajo, radioPunto);
+            }
+            case 3 -> {
+                dibujarPunto(g2, izq, arriba, radioPunto);
+                dibujarPunto(g2, medioX, medioY, radioPunto);
+                dibujarPunto(g2, der, abajo, radioPunto);
+            }
+            case 4 -> {
+                dibujarPunto(g2, izq, arriba, radioPunto);
+                dibujarPunto(g2, der, arriba, radioPunto);
+                dibujarPunto(g2, izq, abajo, radioPunto);
+                dibujarPunto(g2, der, abajo, radioPunto);
+            }
+            case 5 -> {
+                dibujarPunto(g2, izq, arriba, radioPunto);
+                dibujarPunto(g2, der, arriba, radioPunto);
+                dibujarPunto(g2, medioX, medioY, radioPunto);
+                dibujarPunto(g2, izq, abajo, radioPunto);
+                dibujarPunto(g2, der, abajo, radioPunto);
+            }
+            case 6 -> {
+                dibujarPunto(g2, izq, arriba, radioPunto);
+                dibujarPunto(g2, der, arriba, radioPunto);
+                dibujarPunto(g2, izq, medioY, radioPunto);
+                dibujarPunto(g2, der, medioY, radioPunto);
+                dibujarPunto(g2, izq, abajo, radioPunto);
+                dibujarPunto(g2, der, abajo, radioPunto);
+            }
+            default -> { } // no debería pasar (los dados van de 1 a 6)
+        }
+    }
+
+    private void dibujarPunto(Graphics2D g2, int cx, int cy, int radio) {
+        g2.fillOval(cx - radio, cy - radio, radio * 2, radio * 2);
     }
 
     /**
