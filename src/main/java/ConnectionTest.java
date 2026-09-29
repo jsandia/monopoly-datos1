@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Scanner;
 
 /**
  * Prueba de conexión independiente del juego. Sirve para confirmar,
@@ -9,6 +10,10 @@ import java.net.*;
  * Uso:
  *   En UNA computadora:  java ConnectionTest host
  *   En la OTRA:          java ConnectionTest client
+ *
+ * También se puede correr SIN argumentos (por ejemplo, apretando ▶️
+ * directo en IntelliJ sin configurar nada): en ese caso pregunta por
+ * consola si es host o client.
  *
  * El cliente descubre al host solo (mismo mecanismo de Discovery.java
  * que usa el juego), se conecta, y hace 5 "pings" midiendo cuánto tarda
@@ -20,17 +25,25 @@ public class ConnectionTest {
     private static final int TEST_PORT = 5050; // puerto distinto al del juego (5000), para no chocar
 
     public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
-        if (args.length == 0) {
-            System.out.println("Uso:");
-            System.out.println("  java ConnectionTest host    <- corré esto en UNA computadora");
-            System.out.println("  java ConnectionTest client  <- corré esto en la OTRA");
-            return;
-        }
+        String modo = (args.length > 0) ? args[0] : preguntarModo();
 
-        switch (args[0]) {
+        switch (modo) {
             case "host"   -> runHost();
             case "client" -> runClient();
             default       -> System.out.println("Argumento inválido. Usá 'host' o 'client'.");
+        }
+    }
+
+    /** Pregunta por consola si esta computadora es host o client (cuando no se pasó como argumento). */
+    private static String preguntarModo() {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.print("¿Esta computadora es el host o el client? (host/client): ");
+            String respuesta = scanner.nextLine().trim().toLowerCase();
+            if (respuesta.equals("host") || respuesta.equals("client")) {
+                return respuesta;
+            }
+            System.out.println("Escribí exactamente 'host' o 'client'.");
         }
     }
 
