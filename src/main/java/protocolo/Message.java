@@ -17,6 +17,8 @@ public sealed interface Message extends Serializable
         Message.TirarDadosPrueba,
         Message.ComprarPropiedad,
         Message.TerminarTurno,
+        Message.PagarMultaCarcel,
+        Message.UsarCartaCarcel,
         Message.Dados,
         Message.Aviso,
         Message.EstadoJuego,
@@ -105,6 +107,12 @@ public sealed interface Message extends Serializable
 
     record TerminarTurno() implements Message {}
 
+    /** Estando preso y antes de tirar: pagar la multa para salir. */
+    record PagarMultaCarcel() implements Message {}
+
+    /** Estando preso y antes de tirar: usar una carta "Salga de la cárcel". */
+    record UsarCartaCarcel() implements Message {}
+
     /** Filtros opcionales y orden; el servidor conserva y consulta el historial oficial. */
     record ConsultarTransacciones(String jugador, String tipo, boolean recientesPrimero) implements Message {}
 
@@ -134,6 +142,8 @@ public sealed interface Message extends Serializable
      * Foto completa de la partida. Los arreglos tienen una posición por
      * jugador (0 a 3). computadoras[i] dice desde qué computadora se juega
      * el jugador i, para que cada cliente sepa si el turno es suyo.
+     * enCarcel[i] dice si el jugador i está preso y cartasCarcel[i] cuántas
+     * cartas "Salga de la cárcel" tiene guardadas.
      */
     record EstadoJuego(
             int turnoGlobal,
@@ -145,6 +155,8 @@ public sealed interface Message extends Serializable
             int[] computadoras,
             boolean yaTiro,
             boolean puedeComprar,
-            boolean terminado
+            boolean terminado,
+            boolean[] enCarcel,
+            int[] cartasCarcel
     ) implements Message {}
 }

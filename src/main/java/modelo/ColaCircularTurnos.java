@@ -69,6 +69,15 @@ public class ColaCircularTurnos {
         return activos;
     }
 
+    // Devuelve el jugador en el orden en que se agrego (0 = el primero).
+    // No cambia el turno; sirve para recorrer a todos (cartas de "cada jugador").
+    public Jugador obtenerPorIndice(int indice) {
+        if (indice < 0 || indice >= cantidad) {
+            return null;
+        }
+        return jugadores[indice];
+    }
+
     // Verifica si la cola no tiene jugadores
     public boolean estaVacia() {
         return cantidad == 0;

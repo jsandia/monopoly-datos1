@@ -280,6 +280,23 @@ public class Banco {
 
 
     // =========================================================
+    // CARCEL
+    // =========================================================
+
+    /**
+     * Cobra la multa para salir de la cárcel.
+     */
+    public synchronized boolean cobrarMultaCarcel(
+            Jugador jugador,
+            int multa
+    ) {
+
+        return cobrarJugador(jugador, multa, TipoTransaccion.PAGO_AL_BANCO,
+                "Multa para salir de la cárcel");
+    }
+
+
+    // =========================================================
     // COMPRA DE PROPIEDAD
     // =========================================================
 

@@ -69,7 +69,7 @@ public class GameServer {
             new ObjectOutputStream[2];
 
     private static final int MAX_TURNOS = 100;
-    private static final int SALDO_INICIAL = 1500000;
+    private static final int SALDO_INICIAL = 1500; // como el Monopoly original
 
     // null mientras no se hayan unido las 2 computadoras
     private Juego juego;
@@ -282,6 +282,16 @@ public class GameServer {
                 else if (mensaje instanceof Message.TerminarTurno) {
 
                     terminarTurno(playerId, out);
+                }
+
+                else if (mensaje instanceof Message.PagarMultaCarcel) {
+
+                    salirDeCarcel(playerId, out, true);
+                }
+
+                else if (mensaje instanceof Message.UsarCartaCarcel) {
+
+                    salirDeCarcel(playerId, out, false);
                 }
 
                 else if (mensaje instanceof Message.ConsultarTransacciones consulta) {
@@ -929,9 +939,10 @@ public class GameServer {
 
         synchronized (gameLock) {
 
-            tablero = new Tablero();
-
             juego = new Juego(MAX_TURNOS, 4, partida.codigo);
+
+            // Un solo tablero: el mismo con el que Juego mueve y resuelve las casillas
+            tablero = juego.getTablero();
 
             String[] nombres = {
                     partida.jugador1,
@@ -1007,16 +1018,12 @@ public class GameServer {
             return "DADO_INVALIDO";
         }
 
-        Jugador actual = juego.getJugadorActual();
-
-        int posicionAnterior = actual.getPosicionActual();
-
-        juego.ejecutarMovimientoJugadorActual(dado1 + dado2);
+        // Juego aplica todas las reglas: cárcel, movimiento, Salida,
+        // cartas de Suerte / Arca Comunal y "Vaya a la cárcel".
+        // Devuelve qué pasó, una línea por evento.
+        String resultado = juego.jugarTiro(dado1, dado2);
 
         yaTiro = true;
-
-        Casilla casilla =
-                tablero.obtenerCasilla(actual.getPosicionActual());
 
         // Primero los dados, para que los clientes los animen...
         difundir(new Message.Dados(
@@ -1025,21 +1032,7 @@ public class GameServer {
                 dado2
         ));
 
-        difundir(new Message.Aviso(
-                actual.getNombre()
-                        + " sacó [" + dado1 + "][" + dado2 + "] = "
-                        + (dado1 + dado2)
-                        + " y cae en "
-                        + casilla.getNombre()
-        ));
-
-        // Juego cobra la salida solo cuando la posición "da la vuelta"
-        if (actual.getPosicionActual() < posicionAnterior) {
-
-            difundir(new Message.Aviso(
-                    actual.getNombre() + " pasó por Salida y cobra."
-            ));
-        }
+        difundir(new Message.Aviso(resultado));
 
         // ...y después cómo quedó todo
         difundir(crearEstado());
@@ -1136,6 +1129,52 @@ public class GameServer {
                             + propiedad.getPrecioCompra()
                             + " y comprar " + propiedad.getNombre() + "."
             ));
+        }
+    }
+
+    // Estando preso y antes de tirar: pagar la multa (conMulta) o usar la carta.
+    // Si sale, tira normal después.
+    private void salirDeCarcel(
+            int computadora,
+            ObjectOutputStream out,
+            boolean conMulta
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            String error = validarTurno(computadora);
+
+            Jugador actual = (error == null) ? juego.getJugadorActual() : null;
+
+            if (error == null && yaTiro) {
+                error = "Ya tiraste los dados en este turno.";
+            } else if (error == null && !actual.isEnCarcel()) {
+                error = actual.getNombre() + " no está en la cárcel.";
+            }
+
+            if (error != null) {
+                escribir(out, new Message.Aviso(error));
+                return;
+            }
+
+            boolean salio = conMulta
+                    ? juego.pagarMultaCarcel()
+                    : juego.usarCartaSalirCarcel();
+
+            if (!salio) {
+                escribir(out, new Message.Aviso(conMulta
+                        ? "Saldo insuficiente para pagar la multa de ₡" + Juego.MULTA_CARCEL + "."
+                        : actual.getNombre() + " no tiene cartas para salir de la cárcel."));
+                return;
+            }
+
+            difundir(new Message.Aviso(actual.getNombre()
+                    + (conMulta
+                        ? " paga ₡" + Juego.MULTA_CARCEL + " y sale de la cárcel."
+                        : " usa su carta y sale de la cárcel.")
+                    + " Ahora puede tirar los dados."));
+
+            difundir(crearEstado());
         }
     }
 
@@ -1271,12 +1310,16 @@ public class GameServer {
         String[] nombres = new String[4];
         int[] saldos = new int[4];
         int[] posiciones = new int[4];
+        boolean[] enCarcel = new boolean[4];
+        int[] cartasCarcel = new int[4];
 
         for (int i = 0; i < 4; i++) {
 
             nombres[i] = jugadores[i].getNombre();
             saldos[i] = jugadores[i].getSaldo();
             posiciones[i] = jugadores[i].getPosicionActual();
+            enCarcel[i] = jugadores[i].isEnCarcel();
+            cartasCarcel[i] = jugadores[i].getCantidadCartasSalirCarcel();
         }
 
         Casilla casillaActual =
@@ -1299,7 +1342,9 @@ public class GameServer {
                 computadoraDe.clone(),
                 yaTiro,
                 puedeComprar,
-                juego.esFinDeJuego()
+                juego.esFinDeJuego(),
+                enCarcel,
+                cartasCarcel
         );
     }
 

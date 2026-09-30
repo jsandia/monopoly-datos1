@@ -80,6 +80,30 @@ public class ListaPropiedades {
         return total;
     }
 
+    // Suma las casas de todas las propiedades (para las cartas de reparaciones)
+    public int contarCasas() {
+        int total = 0;
+        NodoPropiedad actual = cabeza;
+        while (actual != null) {
+            total += actual.getPropiedad().getCantidadCasas();
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    // Cuenta cuantas propiedades tienen hotel (para las cartas de reparaciones)
+    public int contarHoteles() {
+        int total = 0;
+        NodoPropiedad actual = cabeza;
+        while (actual != null) {
+            if (actual.getPropiedad().tieneHotel()) {
+                total++;
+            }
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
     // Devuelve la cantidad actual de propiedades
     public int getCantidad() {
         return cantidad;

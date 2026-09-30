@@ -20,6 +20,14 @@ public class Jugador {
     // Lista enlazada propia para almacenar sus propiedades
     private ListaPropiedades propiedades;
 
+    // Carcel: si esta preso y cuantas veces ha tirado sin sacar dobles
+    private boolean enCarcel;
+    private int turnosEnCarcel;
+
+    // Cartas "Salga de la carcel" que se guardo. Maximo 2: hay una en cada mazo.
+    // Se guarda la carta misma (no solo un contador) para devolverla a su mazo al usarla.
+    private final CartaEvento[] cartasSalirCarcel = new CartaEvento[2];
+
     // Constructor principal del jugador
     public Jugador(String id, String nombre, int saldoInicial) {
         this.id = id;
@@ -74,6 +82,69 @@ public class Jugador {
     // Actualiza la posicion dentro del tablero
     public void mover(int casillasAvanzar, int totalCasillasTablero) {
         this.posicionActual = (this.posicionActual + casillasAvanzar) % totalCasillasTablero;
+    }
+
+    // =========================================================
+    // CARCEL
+    // =========================================================
+
+    // Lo pone preso en la casilla de la carcel. No usa mover(), asi que no cobra Salida.
+    public void enviarACarcel(int posicionCarcel) {
+        this.posicionActual = posicionCarcel;
+        this.enCarcel = true;
+        this.turnosEnCarcel = 0;
+    }
+
+    // Sale de la carcel; se queda en la misma casilla ("de visita")
+    public void liberarDeCarcel() {
+        this.enCarcel = false;
+        this.turnosEnCarcel = 0;
+    }
+
+    // Suma un intento fallido de sacar dobles
+    public void sumarIntentoCarcel() {
+        this.turnosEnCarcel++;
+    }
+
+    public boolean isEnCarcel() {
+        return enCarcel;
+    }
+
+    public int getTurnosEnCarcel() {
+        return turnosEnCarcel;
+    }
+
+    // Guarda una carta "Salga de la carcel". Devuelve false si ya tiene 2.
+    public boolean guardarCartaSalirCarcel(CartaEvento carta) {
+        for (int i = 0; i < cartasSalirCarcel.length; i++) {
+            if (cartasSalirCarcel[i] == null) {
+                cartasSalirCarcel[i] = carta;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Entrega una de sus cartas para usarla (y devolverla al mazo). null si no tiene.
+    public CartaEvento usarCartaSalirCarcel() {
+        for (int i = 0; i < cartasSalirCarcel.length; i++) {
+            if (cartasSalirCarcel[i] != null) {
+                CartaEvento carta = cartasSalirCarcel[i];
+                cartasSalirCarcel[i] = null;
+                return carta;
+            }
+        }
+        return null;
+    }
+
+    public int getCantidadCartasSalirCarcel() {
+        int total = 0;
+        for (CartaEvento carta : cartasSalirCarcel) {
+            if (carta != null) {
+                total++;
+            }
+        }
+        return total;
     }
 
     // Agrega una propiedad comprada a su lista propia

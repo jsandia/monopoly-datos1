@@ -49,6 +49,8 @@ public class VentanaTablero extends JFrame {
     private final JButton botonLanzarDados = new JButton("🎲 Dados de prueba (sin cajero)");
     private final JButton botonComprar = new JButton("🏠 Comprar Propiedad");
     private final JButton botonTerminarTurno = new JButton("➡️ Terminar Turno");
+    private final JButton botonPagarMulta = new JButton("🔓 Pagar multa de la cárcel");
+    private final JButton botonUsarCarta = new JButton("🃏 Usar carta \"Salga de la cárcel\"");
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
     private VentanaHistorial ventanaHistorial;
     private String[] nombresJugadores = new String[0];
@@ -150,8 +152,12 @@ public class VentanaTablero extends JFrame {
         botonLanzarDados.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         botonComprar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         botonTerminarTurno.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonPagarMulta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonUsarCarta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
 
         botonLanzarDados.setEnabled(false);
+        botonPagarMulta.setEnabled(false);
+        botonUsarCarta.setEnabled(false);
         botonComprar.setEnabled(false);
         botonTerminarTurno.setEnabled(false);
         botonHistorial.setEnabled(false);
@@ -166,6 +172,10 @@ public class VentanaTablero extends JFrame {
         panelBotones.add(botonComprar);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonTerminarTurno);
+        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
+        panelBotones.add(botonPagarMulta);
+        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
+        panelBotones.add(botonUsarCarta);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonHistorial);
 
@@ -279,6 +289,7 @@ public class VentanaTablero extends JFrame {
                     .append(estado.nombres()[i])
                     .append(" — ₡").append(estado.saldos()[i])
                     .append(" — casilla ").append(estado.posiciones()[i])
+                    .append(estado.enCarcel()[i] ? " — 🔒 preso" : "")
                     .append("<br>");
         }
         etiquetaJugadores.setText(lista.append("</html>").toString());
@@ -287,9 +298,15 @@ public class VentanaTablero extends JFrame {
             etiquetaIndicacion.setText("Partida terminada");
         } else if (!estado.yaTiro()) {
             panelTablero.ocultarDados(); // turno nuevo: todavía no hay dados
-            etiquetaIndicacion.setText(esMiTurno
-                    ? "🎲 Tirá los dados en el cajero"
-                    : "Esperando a que " + nombreEnTurno + " tire los dados");
+            if (estado.enCarcel()[enTurno]) {
+                etiquetaIndicacion.setText(esMiTurno
+                        ? "🔒 En la cárcel: pagá, usá una carta o tirá buscando dobles"
+                        : nombreEnTurno + " está en la cárcel");
+            } else {
+                etiquetaIndicacion.setText(esMiTurno
+                        ? "🎲 Tirá los dados en el cajero"
+                        : "Esperando a que " + nombreEnTurno + " tire los dados");
+            }
         } else {
             etiquetaIndicacion.setText(esMiTurno ? "Comprá o terminá el turno" : "Juega " + nombreEnTurno);
             mostrarCasilla(modeloTablero.obtenerCasilla(estado.posiciones()[enTurno]));
@@ -300,6 +317,9 @@ public class VentanaTablero extends JFrame {
         botonLanzarDados.setEnabled(esMiTurno && !estado.yaTiro());
         botonComprar.setEnabled(esMiTurno && estado.puedeComprar());
         botonTerminarTurno.setEnabled(esMiTurno && estado.yaTiro());
+        boolean presoSinTirar = esMiTurno && !estado.yaTiro() && estado.enCarcel()[enTurno];
+        botonPagarMulta.setEnabled(presoSinTirar);
+        botonUsarCarta.setEnabled(presoSinTirar && estado.cartasCarcel()[enTurno] > 0);
 
         // Fichas: si alguna cambió de casilla, el panel la hace caminar hasta ahí.
         // Como aplicarEstado se llama cuando terminan de girar los dados, las
@@ -335,6 +355,16 @@ public class VentanaTablero extends JFrame {
         botonTerminarTurno.addActionListener(e -> {
             botonTerminarTurno.setEnabled(false);
             enviar.accept(new Message.TerminarTurno());
+        });
+        botonPagarMulta.addActionListener(e -> {
+            botonPagarMulta.setEnabled(false);
+            botonUsarCarta.setEnabled(false);
+            enviar.accept(new Message.PagarMultaCarcel());
+        });
+        botonUsarCarta.addActionListener(e -> {
+            botonPagarMulta.setEnabled(false);
+            botonUsarCarta.setEnabled(false);
+            enviar.accept(new Message.UsarCartaCarcel());
         });
     }
 

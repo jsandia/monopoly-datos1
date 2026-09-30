@@ -106,4 +106,17 @@ public class Tablero {
     public Nodo<Casilla> getPrimerNodo() {
         return casillas.getCabeza();
     }
+
+    /**
+     * @param indice posición en el tablero (0 = Salida)
+     * @return el nodo de esa casilla, para seguir caminando con
+     *         getSiguiente() o getAnterior() desde ahí
+     */
+    public Nodo<Casilla> obtenerNodo(int indice) {
+        Nodo<Casilla> actual = casillas.getCabeza();
+        for (int i = 0; i < indice; i++) {
+            actual = actual.getSiguiente();
+        }
+        return actual;
+    }
 }
