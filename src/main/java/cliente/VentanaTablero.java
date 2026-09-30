@@ -49,6 +49,9 @@ public class VentanaTablero extends JFrame {
     private final JButton botonLanzarDados = new JButton("🎲 Dados de prueba (sin cajero)");
     private final JButton botonComprar = new JButton("🏠 Comprar Propiedad");
     private final JButton botonTerminarTurno = new JButton("➡️ Terminar Turno");
+    private final JButton botonHistorial = new JButton("Historial y exportar TXT");
+    private VentanaHistorial ventanaHistorial;
+    private String[] nombresJugadores = new String[0];
 
     private final JLabel etiquetaIndicacion = new JLabel("Esperando a la otra computadora…");
     private final JLabel etiquetaJugadores = new JLabel(" ");
@@ -151,6 +154,8 @@ public class VentanaTablero extends JFrame {
         botonLanzarDados.setEnabled(false);
         botonComprar.setEnabled(false);
         botonTerminarTurno.setEnabled(false);
+        botonHistorial.setEnabled(false);
+        botonHistorial.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
 
         etiquetaIndicacion.setFont(new Font("SansSerif", Font.BOLD, 13));
         etiquetaIndicacion.setForeground(new Color(0xC0392B));
@@ -161,6 +166,8 @@ public class VentanaTablero extends JFrame {
         panelBotones.add(botonComprar);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonTerminarTurno);
+        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
+        panelBotones.add(botonHistorial);
 
         panel.add(etiquetaTurnoJugador, 0);
         panel.add(etiquetaSaldoJugador, 1);
@@ -199,6 +206,10 @@ public class VentanaTablero extends JFrame {
                 animarDados(dados.dado1(), dados.dado2());
             } else if (mensaje instanceof Message.Aviso aviso) {
                 registrarLog(aviso.texto());
+            } else if (mensaje instanceof Message.HistorialTransacciones historial) {
+                if (ventanaHistorial != null && ventanaHistorial.isDisplayable()) {
+                    ventanaHistorial.recibir(historial);
+                }
             } else if (mensaje instanceof Message.EstadoJuego estado) {
                 if (temporizadorDados != null) {
                     estadoPendiente = estado; // se aplica cuando los dados terminen de girar
@@ -251,6 +262,8 @@ public class VentanaTablero extends JFrame {
 
     /** Pone la ventana igual a lo que dice el servidor. */
     private void aplicarEstado(Message.EstadoJuego estado) {
+        nombresJugadores = estado.nombres().clone();
+        botonHistorial.setEnabled(true);
         int enTurno = estado.enTurno();
         String nombreEnTurno = estado.nombres()[enTurno];
         boolean esMiTurno = estado.computadoras()[enTurno] == miComputadora && !estado.terminado();
@@ -303,6 +316,13 @@ public class VentanaTablero extends JFrame {
     }
 
     private void configurarEventosBotones() {
+        botonHistorial.addActionListener(evento -> {
+            if (ventanaHistorial == null || !ventanaHistorial.isDisplayable()) {
+                ventanaHistorial = new VentanaHistorial(this, nombresJugadores, enviar);
+            }
+            ventanaHistorial.setVisible(true);
+            ventanaHistorial.consultar();
+        });
         // Solo mandan la intención. Lo que pase lo contesta el servidor.
         botonLanzarDados.addActionListener(e -> {
             botonLanzarDados.setEnabled(false); // evita doble clic mientras responde

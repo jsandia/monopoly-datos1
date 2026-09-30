@@ -19,7 +19,10 @@ public sealed interface Message extends Serializable
         Message.TerminarTurno,
         Message.Dados,
         Message.Aviso,
-        Message.EstadoJuego {
+        Message.EstadoJuego,
+        Message.ConsultarTransacciones,
+        Message.ExportarTransacciones,
+        Message.HistorialTransacciones {
 
     // =========================================================
     // MENSAJES ORIGINALES
@@ -101,6 +104,14 @@ public sealed interface Message extends Serializable
     record ComprarPropiedad() implements Message {}
 
     record TerminarTurno() implements Message {}
+
+    /** Filtros opcionales y orden; el servidor conserva y consulta el historial oficial. */
+    record ConsultarTransacciones(String jugador, String tipo, boolean recientesPrimero) implements Message {}
+
+    record ExportarTransacciones() implements Message {}
+
+    /** Texto preparado por el servidor, para mostrar o guardar una copia en el cliente. */
+    record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Message {}
 
 
     // =========================================================

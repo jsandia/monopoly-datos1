@@ -27,12 +27,22 @@ public class Banco {
     private int saldo;
     private RegistroTransacciones registro;
 
-    public void setRegistroTransacciones(RegistroTransacciones registro) {
+    public synchronized void setRegistroTransacciones(RegistroTransacciones registro) {
         this.registro = registro;
     }
 
-    private void registrar(Jugador jugador, String operacion, String detalle, int anterior) {
-        if (registro != null) registro.registrar(jugador, operacion, detalle, anterior);
+    private void registrar(Jugador jugador, TipoTransaccion tipo, String detalle, int anterior) {
+        if (registro == null) return;
+        int diferencia = jugador.getSaldo() - anterior;
+        // El movimiento del banco es el inverso del movimiento del jugador.
+        int bancoAnterior = saldo + diferencia;
+        if (diferencia > 0) {
+            registro.registrar(tipo, null, jugador, diferencia, detalle,
+                    bancoAnterior, saldo, anterior, jugador.getSaldo());
+        } else if (diferencia < 0) {
+            registro.registrar(tipo, jugador, null, -(long) diferencia, detalle,
+                    anterior, jugador.getSaldo(), bancoAnterior, saldo);
+        }
     }
 
 
@@ -127,7 +137,7 @@ public class Banco {
     /**
      * Hace que el banco reciba dinero.
      */
-    public void recibirDinero(int monto) {
+    public synchronized void recibirDinero(int monto) {
 
         if (monto > 0) {
             saldo += monto;
@@ -142,7 +152,7 @@ public class Banco {
      * Retorna false si el monto es inválido
      * o el banco no tiene suficiente.
      */
-    public boolean entregarDinero(int monto) {
+    public synchronized boolean entregarDinero(int monto) {
 
         if (monto <= 0) {
             return false;
@@ -165,10 +175,11 @@ public class Banco {
     /**
      * El banco paga dinero a un jugador.
      */
-    public boolean pagarJugador(
-            Jugador jugador,
-            int monto
-    ) {
+    public synchronized boolean pagarJugador(Jugador jugador, int monto) {
+        return pagarJugador(jugador, monto, TipoTransaccion.PAGO_DEL_BANCO, "Banco");
+    }
+
+    private boolean pagarJugador(Jugador jugador, int monto, TipoTransaccion tipo, String descripcion) {
         int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
 
 
@@ -186,7 +197,7 @@ public class Banco {
 
         jugador.acreditar(monto);
 
-        registrar(jugador, "PAGO DEL BANCO", "Banco", saldoAnterior);
+        registrar(jugador, tipo, descripcion, saldoAnterior);
 
         return true;
     }
@@ -199,10 +210,11 @@ public class Banco {
     /**
      * El banco cobra dinero a un jugador.
      */
-    public boolean cobrarJugador(
-            Jugador jugador,
-            int monto
-    ) {
+    public synchronized boolean cobrarJugador(Jugador jugador, int monto) {
+        return cobrarJugador(jugador, monto, TipoTransaccion.PAGO_AL_BANCO, "Banco");
+    }
+
+    private boolean cobrarJugador(Jugador jugador, int monto, TipoTransaccion tipo, String descripcion) {
         int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
 
 
@@ -220,7 +232,7 @@ public class Banco {
 
         recibirDinero(monto);
 
-        registrar(jugador, "COBRO DEL BANCO", "Banco", saldoAnterior);
+        registrar(jugador, tipo, descripcion, saldoAnterior);
 
         return true;
     }
@@ -233,7 +245,7 @@ public class Banco {
     /**
      * Paga al jugador cuando pasa por la casilla de salida.
      */
-    public boolean pagarSalida(
+    public synchronized boolean pagarSalida(
             Jugador jugador,
             int monto
     ) {
@@ -241,7 +253,7 @@ public class Banco {
         if (jugador == null || monto <= 0 || !entregarDinero(monto)) return false;
         int anterior = jugador.getSaldo();
         jugador.acreditar(monto);
-        registrar(jugador, "COBRO POR SALIDA", "Banco", anterior);
+        registrar(jugador, TipoTransaccion.PREMIO_INICIO, "Premio por pasar por inicio", anterior);
         return true;
     }
 
@@ -253,7 +265,7 @@ public class Banco {
     /**
      * Cobra un impuesto al jugador.
      */
-    public boolean cobrarImpuesto(
+    public synchronized boolean cobrarImpuesto(
             Jugador jugador,
             int impuesto
     ) {
@@ -262,7 +274,7 @@ public class Banco {
         int anterior = jugador.getSaldo();
         if (!jugador.debitar(impuesto)) return false;
         recibirDinero(impuesto);
-        registrar(jugador, "IMPUESTO", "Banco", anterior);
+        registrar(jugador, TipoTransaccion.PAGO_AL_BANCO, "Pago de impuesto", anterior);
         return true;
     }
 
@@ -276,7 +288,7 @@ public class Banco {
      *
      * La propiedad debe estar libre.
      */
-    public boolean comprarPropiedad(
+    public synchronized boolean comprarPropiedad(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -316,7 +328,7 @@ public class Banco {
         // Se agrega la propiedad al jugador.
         jugador.agregarPropiedad(propiedad);
 
-        registrar(jugador, "COMPRA DE PROPIEDAD", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.COMPRA_PROPIEDAD, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -330,7 +342,7 @@ public class Banco {
      * Cobra el alquiler cuando un jugador
      * cae en la propiedad de otro jugador.
      */
-    public boolean cobrarAlquiler(
+    public synchronized boolean cobrarAlquiler(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -378,8 +390,11 @@ public class Banco {
         // El dueño recibe el alquiler.
         propietario.acreditar(alquiler);
 
-        registrar(jugador, "PAGO DE ALQUILER", propiedad.getNombre() + " -> " + propietario.getId() + " - " + propietario.getNombre(), saldoAnterior);
-        registrar(propietario, "INGRESO DE ALQUILER", propiedad.getNombre() + " <- " + jugador.getId() + " - " + jugador.getNombre(), propietario.getSaldo() - alquiler);
+        if (registro != null) {
+            registro.registrar(TipoTransaccion.PAGO_ALQUILER, jugador, propietario, alquiler,
+                    "Alquiler de " + propiedad.getNombre(), saldoAnterior, jugador.getSaldo(),
+                    propietario.getSaldo() - alquiler, propietario.getSaldo());
+        }
 
         return true;
     }
@@ -392,7 +407,7 @@ public class Banco {
     /**
      * Permite que un jugador compre una casa.
      */
-    public boolean comprarCasa(
+    public synchronized boolean comprarCasa(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -464,7 +479,7 @@ public class Banco {
         // El banco entrega una casa.
         casasDisponibles--;
 
-        registrar(jugador, "COMPRA DE CASA", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.COMPRA_CASA, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -479,7 +494,7 @@ public class Banco {
      *
      * Recibe la mitad del precio de compra.
      */
-    public boolean venderCasa(
+    public synchronized boolean venderCasa(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -531,7 +546,7 @@ public class Banco {
         // La casa vuelve al banco.
         casasDisponibles++;
 
-        registrar(jugador, "VENTA DE CASA", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.VENTA_CASA, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -547,7 +562,7 @@ public class Banco {
      * Para construirlo debe tener exactamente
      * cuatro casas.
      */
-    public boolean comprarHotel(
+    public synchronized boolean comprarHotel(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -622,7 +637,7 @@ public class Banco {
          */
         casasDisponibles += 4;
 
-        registrar(jugador, "COMPRA DE HOTEL", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.COMPRA_HOTEL, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -637,7 +652,7 @@ public class Banco {
      *
      * Recibe la mitad del precio del hotel.
      */
-    public boolean venderHotel(
+    public synchronized boolean venderHotel(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -689,7 +704,7 @@ public class Banco {
         // El hotel vuelve al banco.
         hotelesDisponibles++;
 
-        registrar(jugador, "VENTA DE HOTEL", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.VENTA_HOTEL, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -705,7 +720,7 @@ public class Banco {
      * El banco paga al jugador el valor
      * establecido para la hipoteca.
      */
-    public boolean hipotecarPropiedad(
+    public synchronized boolean hipotecarPropiedad(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -764,7 +779,7 @@ public class Banco {
         // El jugador recibe el dinero.
         jugador.acreditar(valorHipoteca);
 
-        registrar(jugador, "HIPOTECA", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.HIPOTECA, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -781,7 +796,7 @@ public class Banco {
      *
      * valor de hipoteca + 10% de interés.
      */
-    public boolean quitarHipoteca(
+    public synchronized boolean quitarHipoteca(
             Jugador jugador,
             Propiedad propiedad
     ) {
@@ -837,7 +852,7 @@ public class Banco {
         // El banco recibe el pago.
         recibirDinero(montoTotal);
 
-        registrar(jugador, "CANCELACION DE HIPOTECA", propiedad.getNombre(), saldoAnterior);
+        registrar(jugador, TipoTransaccion.CANCELACION_HIPOTECA, propiedad.getNombre(), saldoAnterior);
 
         return true;
     }
@@ -847,11 +862,39 @@ public class Banco {
     // PAGOS CON TARJETA RFID
     // =========================================================
 
+    /** Pago validado entre jugadores; una sola transaccion representa ambos movimientos. */
+    public synchronized boolean pagarEntreJugadores(Jugador origen, Jugador destino, int monto, String descripcion) {
+        if (origen == null || destino == null || origen == destino || !origen.isActivo()
+                || !destino.isActivo() || monto <= 0 || descripcion == null
+                || origen.getId().equals(destino.getId())
+                || destino.getSaldo() > Integer.MAX_VALUE - monto) return false;
+        int anteriorOrigen = origen.getSaldo();
+        int anteriorDestino = destino.getSaldo();
+        if (!origen.debitar(monto)) return false;
+        destino.acreditar(monto);
+        if (registro != null) {
+            registro.registrar(TipoTransaccion.PAGO_ENTRE_JUGADORES, origen, destino, monto, descripcion,
+                    anteriorOrigen, origen.getSaldo(), anteriorDestino, destino.getSaldo());
+        }
+        return true;
+    }
+
+    /** Estas operaciones las invoca el servidor al resolver una carta de evento. */
+    public synchronized boolean pagarGananciaEvento(Jugador jugador, int monto, String descripcion) {
+        if (descripcion == null) return false;
+        return pagarJugador(jugador, monto, TipoTransaccion.GANANCIA_EVENTO, descripcion);
+    }
+
+    public synchronized boolean cobrarPerdidaEvento(Jugador jugador, int monto, String descripcion) {
+        if (descripcion == null) return false;
+        return cobrarJugador(jugador, monto, TipoTransaccion.PERDIDA_EVENTO, descripcion);
+    }
+
     private boolean validarTarjetaPago(Jugador jugador, String uid) {
         return jugador != null && jugador.validarTarjeta(uid);
     }
 
-    public boolean comprarPropiedadConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+    public synchronized boolean comprarPropiedadConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
         if (!validarTarjetaPago(jugador, uid)) return false;
         return comprarPropiedad(jugador, propiedad);
     }
