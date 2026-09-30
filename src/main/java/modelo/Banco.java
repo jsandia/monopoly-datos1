@@ -781,4 +781,48 @@ public class Banco {
 
         return true;
     }
+
+
+    // =========================================================
+    // PAGOS CON TARJETA RFID
+    // =========================================================
+
+    private boolean validarTarjetaPago(Jugador jugador, String uid) {
+        return jugador != null && jugador.validarTarjeta(uid);
+    }
+
+    public boolean cobrarJugadorConTarjeta(Jugador jugador, int monto, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return cobrarJugador(jugador, monto);
+    }
+
+    public boolean cobrarImpuestoConTarjeta(Jugador jugador, int impuesto, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return cobrarImpuesto(jugador, impuesto);
+    }
+
+    public boolean comprarPropiedadConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return comprarPropiedad(jugador, propiedad);
+    }
+
+    public boolean cobrarAlquilerConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return cobrarAlquiler(jugador, propiedad);
+    }
+
+    public boolean comprarCasaConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return comprarCasa(jugador, propiedad);
+    }
+
+    public boolean comprarHotelConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return comprarHotel(jugador, propiedad);
+    }
+
+    public boolean quitarHipotecaConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return quitarHipoteca(jugador, propiedad);
+    }
 }

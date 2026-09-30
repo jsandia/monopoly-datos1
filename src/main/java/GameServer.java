@@ -85,6 +85,19 @@ public class GameServer {
     // Fase del turno: false = esperando dados, true = ya se movio
     private boolean yaTiro = false;
 
+    // =========================================================
+    // RFID
+    // =========================================================
+
+    // Cada computadora puede indicar cuál de sus 2 jugadores espera tarjeta.
+    // -1 = ninguno, 0 = primer jugador local, 1 = segundo jugador local.
+    private final int[] jugadorLocalEsperandoTarjeta = {-1, -1};
+
+    // Compra que está esperando autorización con la tarjeta del jugador.
+    private Jugador jugadorPendientePago;
+    private Propiedad propiedadPendientePago;
+    private int computadoraPendientePago = -1;
+
 
     // =========================================================
     // CONSTRUCTORES
@@ -257,6 +270,15 @@ public class GameServer {
                 // =================================================
                 // ACCIONES DE LA PARTIDA (el cliente solo pide)
                 // =================================================
+
+                else if (mensaje instanceof Message.SolicitarRegistroTarjeta solicitud) {
+
+                    solicitarRegistroTarjeta(
+                            playerId,
+                            solicitud.indiceLocal(),
+                            out
+                    );
+                }
 
                 else if (mensaje instanceof Message.TirarDadosPrueba) {
 
@@ -912,6 +934,10 @@ public class GameServer {
                 jugadores[i] =
                         new Jugador("J" + (i + 1), nombres[i], SALDO_INICIAL);
 
+                if (partida.tarjetas[i] != null) {
+                    jugadores[i].registrarTarjeta(partida.tarjetas[i]);
+                }
+
                 juego.agregarJugador(jugadores[i]);
 
                 // Jugadores 1 y 2 son de quien creó la partida, 3 y 4 de quien se unió
@@ -1072,7 +1098,7 @@ public class GameServer {
                 return;
             }
 
-            if (!juego.getBanco().comprarPropiedad(actual, propiedad)) {
+            if (actual.getSaldo() < propiedad.getPrecioCompra()) {
 
                 escribir(out, new Message.Aviso(
                         "Saldo insuficiente para comprar "
@@ -1081,12 +1107,23 @@ public class GameServer {
                 return;
             }
 
-            difundir(new Message.Aviso(
-                    "¡" + actual.getNombre()
-                            + " compró " + propiedad.getNombre() + "!"
-            ));
+            if (!actual.tieneTarjetaRegistrada()) {
+                escribir(out, new Message.Aviso(
+                        actual.getNombre() + " no tiene una tarjeta RFID registrada."
+                ));
+                return;
+            }
 
-            difundir(crearEstado());
+            jugadorPendientePago = actual;
+            propiedadPendientePago = propiedad;
+            computadoraPendientePago = computadora;
+
+            escribir(out, new Message.Aviso(
+                    actual.getNombre()
+                            + ", acerque su tarjeta RFID para pagar ₡"
+                            + propiedad.getPrecioCompra()
+                            + " y comprar " + propiedad.getNombre() + "."
+            ));
         }
     }
 
@@ -1303,20 +1340,223 @@ public class GameServer {
 
     // Lo llama ManejadorCajero cada vez que la Pico manda TARJETA;UID.
     // El UID viene en hexadecimal, ej: "43B121A1".
-    public void recibirTarjetaDelCajero(
+    public String recibirTarjetaDelCajero(
             String uid
     ) {
 
         synchronized (gameLock) {
+
+            if (uid == null || uid.trim().isEmpty()) {
+                return "TARJETA_INVALIDA";
+            }
+
+            uid = uid.trim().toUpperCase();
 
             System.out.println(
                     "[CAJERO] Tarjeta: "
                             + uid
             );
 
-            // AQUI: llamar el metodo que ya tienen para usar la tarjeta.
-            // Ejemplo: procesarTarjeta(uid);
+            // Primero se atiende un pago pendiente de la partida.
+            if (jugadorPendientePago != null && propiedadPendientePago != null) {
+
+                if (!jugadorPendientePago.validarTarjeta(uid)) {
+                    avisarComputadora(
+                            computadoraPendientePago,
+                            "Tarjeta incorrecta. Debe pagar "
+                                    + jugadorPendientePago.getNombre() + "."
+                    );
+                    return "TARJETA_INCORRECTA";
+                }
+
+                Jugador jugador = jugadorPendientePago;
+                Propiedad propiedad = propiedadPendientePago;
+                int computadora = computadoraPendientePago;
+
+                limpiarPagoPendiente();
+
+                if (!juego.getBanco().comprarPropiedadConTarjeta(
+                        jugador, propiedad, uid
+                )) {
+                    avisarComputadora(computadora, "No se pudo realizar el pago.");
+                    return "PAGO_RECHAZADO";
+                }
+
+                difundir(new Message.Aviso(
+                        "¡" + jugador.getNombre()
+                                + " pagó con su tarjeta y compró "
+                                + propiedad.getNombre() + "!"
+                ));
+
+                difundir(crearEstado());
+                return null;
+            }
+
+            // Si no hay pago, la tarjeta se usa para el registro solicitado.
+            for (int computadora = 0; computadora < jugadorLocalEsperandoTarjeta.length; computadora++) {
+
+                int indiceLocal = jugadorLocalEsperandoTarjeta[computadora];
+
+                if (indiceLocal == -1) {
+                    continue;
+                }
+
+                Partida partida = buscarPartidaDeComputadora(computadora);
+
+                if (partida == null) {
+                    jugadorLocalEsperandoTarjeta[computadora] = -1;
+                    return "NO_HAY_PARTIDA";
+                }
+
+                if (tarjetaYaRegistrada(uid)) {
+                    enviarResultadoTarjeta(
+                            computadora, indiceLocal, uid, false,
+                            "Esta tarjeta ya pertenece a otro jugador."
+                    );
+                    return "TARJETA_YA_REGISTRADA";
+                }
+
+                int indiceGlobal =
+                        computadora == partida.computadoraCreadora
+                                ? indiceLocal
+                                : 2 + indiceLocal;
+
+                partida.tarjetas[indiceGlobal] = uid;
+
+                if (jugadores[indiceGlobal] != null) {
+                    jugadores[indiceGlobal].registrarTarjeta(uid);
+                }
+
+                jugadorLocalEsperandoTarjeta[computadora] = -1;
+
+                enviarResultadoTarjeta(
+                        computadora, indiceLocal, uid, true,
+                        "Tarjeta registrada correctamente."
+                );
+
+                System.out.println(
+                        "[RFID] Jugador " + (indiceGlobal + 1)
+                                + " registrado con " + uid
+                );
+
+                return null;
+            }
+
+            return "NO_SE_ESPERABA_TARJETA";
         }
+    }
+
+
+    private void solicitarRegistroTarjeta(
+            int computadora,
+            int indiceLocal,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            if (indiceLocal < 0 || indiceLocal > 1) {
+                escribir(out, new Message.TarjetaRegistrada(
+                        indiceLocal, "", false, "Jugador inválido."
+                ));
+                return;
+            }
+
+            if (buscarPartidaDeComputadora(computadora) == null) {
+                escribir(out, new Message.TarjetaRegistrada(
+                        indiceLocal, "", false, "No hay una partida asociada a esta computadora."
+                ));
+                return;
+            }
+
+            jugadorLocalEsperandoTarjeta[computadora] = indiceLocal;
+        }
+    }
+
+
+    private Partida buscarPartidaDeComputadora(int computadora) {
+
+        for (Partida partida : partidas.values()) {
+            if (partida.computadoraCreadora == computadora
+                    || partida.computadoraInvitada == computadora) {
+                return partida;
+            }
+        }
+
+        return null;
+    }
+
+
+    private boolean tarjetaYaRegistrada(String uid) {
+
+        for (Partida partida : partidas.values()) {
+            for (String tarjeta : partida.tarjetas) {
+                if (tarjeta != null && tarjeta.equalsIgnoreCase(uid)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+
+    private void enviarResultadoTarjeta(
+            int computadora,
+            int indiceLocal,
+            String uid,
+            boolean correcta,
+            String mensaje
+    ) {
+
+        if (computadora < 0 || computadora >= salidas.length) {
+            return;
+        }
+
+        ObjectOutputStream out = salidas[computadora];
+
+        if (out == null) {
+            return;
+        }
+
+        try {
+            escribir(out, new Message.TarjetaRegistrada(
+                    indiceLocal, uid, correcta, mensaje
+            ));
+        } catch (IOException e) {
+            System.out.println(
+                    "No se pudo enviar la confirmación RFID: " + e.getMessage()
+            );
+        }
+    }
+
+
+    private void avisarComputadora(int computadora, String mensaje) {
+
+        if (computadora < 0 || computadora >= salidas.length) {
+            return;
+        }
+
+        ObjectOutputStream out = salidas[computadora];
+
+        if (out == null) {
+            return;
+        }
+
+        try {
+            escribir(out, new Message.Aviso(mensaje));
+        } catch (IOException e) {
+            System.out.println(
+                    "No se pudo enviar aviso: " + e.getMessage()
+            );
+        }
+    }
+
+
+    private void limpiarPagoPendiente() {
+        jugadorPendientePago = null;
+        propiedadPendientePago = null;
+        computadoraPendientePago = -1;
     }
 
 
@@ -1359,7 +1599,9 @@ public class GameServer {
 
         // Desde que computadora se juegan jugador1-2 y jugador3-4
         int computadoraCreadora;
-        int computadoraInvitada;
+        int computadoraInvitada = -1;
+
+        String[] tarjetas = new String[4];
 
 
         Partida(
