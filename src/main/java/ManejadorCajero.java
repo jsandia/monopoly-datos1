@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.function.Consumer;
 
 // Atiende la conexion con el cajero (Raspberry Pi Pico 2W).
 // La Pico manda texto, una linea por mensaje, con partes separadas por ';':
@@ -15,9 +16,17 @@ public class ManejadorCajero implements Runnable {
     private final Socket socketCajero;
     private final GameServer servidor;
 
+    // Listener usado por la interfaz para saber qué tarjeta fue escaneada.
+    // No reemplaza el envío al GameServer; solamente notifica también a la interfaz.
+    private static Consumer<String> listenerTarjeta;
+
     public ManejadorCajero(Socket socketCajero, GameServer servidor) {
         this.socketCajero = socketCajero;
         this.servidor = servidor;
+    }
+
+    public static void setListenerTarjeta(Consumer<String> listener) {
+        listenerTarjeta = listener;
     }
 
     @Override
@@ -74,13 +83,13 @@ public class ManejadorCajero implements Runnable {
 
                 String uid = partes[1].trim();
 
-                String resultado = servidor.recibirTarjetaDelCajero(uid);
+                servidor.recibirTarjetaDelCajero(uid);
 
-                escritor.println(
-                        resultado == null
-                                ? "OK_TARJETA"
-                                : "ERROR;" + resultado
-                );
+                if (listenerTarjeta != null) {
+                    listenerTarjeta.accept(uid);
+                }
+
+                escritor.println("OK_TARJETA");
             }
 
             default -> System.out.println("Mensaje desconocido del cajero: " + linea);
