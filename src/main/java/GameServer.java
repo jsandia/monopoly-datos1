@@ -923,7 +923,7 @@ public class GameServer {
 
             tablero = new Tablero();
 
-            juego = new Juego(MAX_TURNOS, 4);
+            juego = new Juego(MAX_TURNOS, 4, partida.codigo);
 
             String[] nombres = {
                     partida.jugador1,
@@ -951,6 +951,7 @@ public class GameServer {
             }
 
             yaTiro = false;
+            difundir(new Message.Aviso("Historial de transacciones: " + juego.getArchivoTransacciones()));
 
             System.out.println(
                     "Partida "
