@@ -25,6 +25,16 @@ public class Banco {
     // =========================================================
 
     private int saldo;
+    private RegistroTransacciones registro;
+
+    public void setRegistroTransacciones(RegistroTransacciones registro) {
+        this.registro = registro;
+    }
+
+    private void registrar(Jugador jugador, String operacion, String detalle, int anterior) {
+        if (registro != null) registro.registrar(jugador, operacion, detalle, anterior);
+    }
+
 
     // Cantidad de casas que tiene disponibles el banco.
     private int casasDisponibles;
@@ -159,6 +169,8 @@ public class Banco {
             Jugador jugador,
             int monto
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -173,6 +185,8 @@ public class Banco {
         }
 
         jugador.acreditar(monto);
+
+        registrar(jugador, "PAGO DEL BANCO", "Banco", saldoAnterior);
 
         return true;
     }
@@ -189,6 +203,8 @@ public class Banco {
             Jugador jugador,
             int monto
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -203,6 +219,8 @@ public class Banco {
         }
 
         recibirDinero(monto);
+
+        registrar(jugador, "COBRO DEL BANCO", "Banco", saldoAnterior);
 
         return true;
     }
@@ -220,7 +238,11 @@ public class Banco {
             int monto
     ) {
 
-        return pagarJugador(jugador, monto);
+        if (jugador == null || monto <= 0 || !entregarDinero(monto)) return false;
+        int anterior = jugador.getSaldo();
+        jugador.acreditar(monto);
+        registrar(jugador, "COBRO POR SALIDA", "Banco", anterior);
+        return true;
     }
 
 
@@ -236,7 +258,12 @@ public class Banco {
             int impuesto
     ) {
 
-        return cobrarJugador(jugador, impuesto);
+        if (jugador == null || impuesto <= 0) return false;
+        int anterior = jugador.getSaldo();
+        if (!jugador.debitar(impuesto)) return false;
+        recibirDinero(impuesto);
+        registrar(jugador, "IMPUESTO", "Banco", anterior);
+        return true;
     }
 
 
@@ -253,6 +280,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -287,6 +316,8 @@ public class Banco {
         // Se agrega la propiedad al jugador.
         jugador.agregarPropiedad(propiedad);
 
+        registrar(jugador, "COMPRA DE PROPIEDAD", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -303,6 +334,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -345,6 +378,9 @@ public class Banco {
         // El dueño recibe el alquiler.
         propietario.acreditar(alquiler);
 
+        registrar(jugador, "PAGO DE ALQUILER", propiedad.getNombre() + " -> " + propietario.getId() + " - " + propietario.getNombre(), saldoAnterior);
+        registrar(propietario, "INGRESO DE ALQUILER", propiedad.getNombre() + " <- " + jugador.getId() + " - " + jugador.getNombre(), propietario.getSaldo() - alquiler);
+
         return true;
     }
 
@@ -360,6 +396,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -426,6 +464,8 @@ public class Banco {
         // El banco entrega una casa.
         casasDisponibles--;
 
+        registrar(jugador, "COMPRA DE CASA", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -443,6 +483,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -489,6 +531,8 @@ public class Banco {
         // La casa vuelve al banco.
         casasDisponibles++;
 
+        registrar(jugador, "VENTA DE CASA", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -507,6 +551,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -576,6 +622,8 @@ public class Banco {
          */
         casasDisponibles += 4;
 
+        registrar(jugador, "COMPRA DE HOTEL", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -593,6 +641,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -639,6 +689,8 @@ public class Banco {
         // El hotel vuelve al banco.
         hotelesDisponibles++;
 
+        registrar(jugador, "VENTA DE HOTEL", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -657,6 +709,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -710,6 +764,8 @@ public class Banco {
         // El jugador recibe el dinero.
         jugador.acreditar(valorHipoteca);
 
+        registrar(jugador, "HIPOTECA", propiedad.getNombre(), saldoAnterior);
+
         return true;
     }
 
@@ -729,6 +785,8 @@ public class Banco {
             Jugador jugador,
             Propiedad propiedad
     ) {
+        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+
 
         if (jugador == null) {
             return false;
@@ -778,6 +836,8 @@ public class Banco {
 
         // El banco recibe el pago.
         recibirDinero(montoTotal);
+
+        registrar(jugador, "CANCELACION DE HIPOTECA", propiedad.getNombre(), saldoAnterior);
 
         return true;
     }

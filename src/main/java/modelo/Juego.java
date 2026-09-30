@@ -18,9 +18,15 @@ public class Juego {
     private ColaCircularTurnos colaTurnos;
     private ListaCircularDoble<Propiedad> tablero;
     private Banco banco;
+    private RegistroTransacciones registro;
 
     // Constructor que inicializa el juego con limite de turnos y la cantidad de jugadores
     public Juego(int maxTurnos, int cantidadJugadores) {
+        this(maxTurnos, cantidadJugadores, "local");
+    }
+
+    public Juego(int maxTurnos, int cantidadJugadores, String codigoPartida) {
+        this.registro = new RegistroTransacciones(codigoPartida);
         this.maxTurnos = maxTurnos;
         this.turnoActualGlobal = 1;
         this.terminado = false;
@@ -28,11 +34,13 @@ public class Juego {
         this.colaTurnos = new ColaCircularTurnos(cantidadJugadores);
         this.tablero = new ListaCircularDoble<>();
         this.banco = new Banco();
+        this.banco.setRegistroTransacciones(registro);
     }
 
     // Agrega un jugador a la cola circular de turnos
     public void agregarJugador(Jugador jugador) {
         this.colaTurnos.encolar(jugador);
+        registro.registrar(jugador, "SALDO INICIAL", "Ingreso a la partida", 0);
     }
 
     // Asigna el tablero con sus casillas/propiedades enlazadas
@@ -71,6 +79,7 @@ public class Juego {
 
         // Verifica si la partida debe terminar por limite de turnos o bancarrota general
         if (this.turnoActualGlobal > this.maxTurnos || colaTurnos.contarJugadoresActivos() <= 1) {
+            if (!this.terminado) registro.escribir("FIN DE PARTIDA | Turno " + turnoActualGlobal);
             this.terminado = true;
         }
     }
@@ -98,6 +107,10 @@ public class Juego {
     // Retorna el contador del turno global
     public int getTurnoActualGlobal() {
         return turnoActualGlobal;
+    }
+
+    public java.nio.file.Path getArchivoTransacciones() {
+        return registro.getArchivo();
     }
 
     public int getMaxTurnos() {
