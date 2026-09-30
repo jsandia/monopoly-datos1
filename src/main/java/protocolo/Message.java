@@ -1,3 +1,5 @@
+package protocolo;
+
 import java.io.Serializable;
 
 public sealed interface Message extends Serializable
@@ -11,7 +13,13 @@ public sealed interface Message extends Serializable
         Message.Login,
         Message.CreateGame,
         Message.JoinGame,
-        Message.Response {
+        Message.Response,
+        Message.TirarDadosPrueba,
+        Message.ComprarPropiedad,
+        Message.TerminarTurno,
+        Message.Dados,
+        Message.Aviso,
+        Message.EstadoJuego {
 
     // =========================================================
     // MENSAJES ORIGINALES
@@ -78,5 +86,54 @@ public sealed interface Message extends Serializable
     record Response(
             String tipo,
             String mensaje
+    ) implements Message {}
+
+
+    // =========================================================
+    // PARTIDA: CLIENTE -> SERVIDOR (solo intenciones)
+    // =========================================================
+    // No llevan datos: el servidor sabe de qué computadora vienen,
+    // revisa que le toque a un jugador de esa computadora y decide.
+
+    /** Pide que el SERVIDOR tire dados al azar (para probar sin el cajero). */
+    record TirarDadosPrueba() implements Message {}
+
+    record ComprarPropiedad() implements Message {}
+
+    record TerminarTurno() implements Message {}
+
+
+    // =========================================================
+    // PARTIDA: SERVIDOR -> TODOS LOS CLIENTES
+    // =========================================================
+
+    /** Se tiraron los dados (del cajero o de prueba). indiceJugador va de 0 a 3. */
+    record Dados(
+            int indiceJugador,
+            int dado1,
+            int dado2
+    ) implements Message {}
+
+    /** Una línea para el "Registro de Partida" (o un error solo para quien lo causó). */
+    record Aviso(
+            String texto
+    ) implements Message {}
+
+    /**
+     * Foto completa de la partida. Los arreglos tienen una posición por
+     * jugador (0 a 3). computadoras[i] dice desde qué computadora se juega
+     * el jugador i, para que cada cliente sepa si el turno es suyo.
+     */
+    record EstadoJuego(
+            int turnoGlobal,
+            int maxTurnos,
+            int enTurno,
+            String[] nombres,
+            int[] saldos,
+            int[] posiciones,
+            int[] computadoras,
+            boolean yaTiro,
+            boolean puedeComprar,
+            boolean terminado
     ) implements Message {}
 }

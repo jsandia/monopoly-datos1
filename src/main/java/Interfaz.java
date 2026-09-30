@@ -1,3 +1,4 @@
+import protocolo.Message;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -591,12 +592,7 @@ public class Interfaz {
                 // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
                 // =================================================
 
-                String j1 = nombreJugador1;
-                String j2 = nombreJugador2;
-
-                SwingUtilities.invokeLater(
-                        () -> new cliente.VentanaTablero(j1, j2).setVisible(true)
-                );
+                abrirTablero();
 
                 ventanaPrincipal.dispose();
 
@@ -798,12 +794,7 @@ public class Interfaz {
                 // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
                 // =================================================
 
-                String j1 = nombreJugador1;
-                String j2 = nombreJugador2;
-
-                SwingUtilities.invokeLater(
-                        () -> new cliente.VentanaTablero(j1, j2).setVisible(true)
-                );
+                abrirTablero();
 
                 ventanaPrincipal.dispose();
 
@@ -834,6 +825,30 @@ public class Interfaz {
     // =========================================================
     // BOTÓN CON IMAGEN
     // =========================================================
+
+    // =========================================================
+    // ABRIR TABLERO
+    // =========================================================
+
+    // Los nombres ya no se pasan: la partida vive en el servidor y la
+    // ventana los recibe en el primer EstadoJuego.
+    public static void abrirTablero() {
+
+        SwingUtilities.invokeLater(() -> {
+
+            cliente.VentanaTablero ventana =
+                    new cliente.VentanaTablero(
+                            cliente.getPlayerId(),
+                            cliente::enviarAccion
+                    );
+
+            // Lo que mande el servidor (dados, avisos, estado) le llega a la ventana
+            cliente.setOyente(ventana::recibirMensaje);
+
+            ventana.setVisible(true);
+        });
+    }
+
 
     public static JButton crearBotonImagen(
             String ruta,

@@ -57,8 +57,9 @@ public class ManejadorCajero implements Runnable {
                 try {
                     int dado1 = Integer.parseInt(partes[1]);
                     int dado2 = Integer.parseInt(partes[2]);
-                    servidor.recibirDadosDelCajero(dado1, dado2);
-                    escritor.println("OK_DADOS");
+                    // null = el servidor movió al jugador en turno con estos dados
+                    String error = servidor.recibirDadosDelCajero(dado1, dado2);
+                    escritor.println(error == null ? "OK_DADOS" : "ERROR;" + error);
                 } catch (NumberFormatException e) {
                     // Por si llega algo como "DADOS;x;4"
                     escritor.println("ERROR;FORMATO_DADOS");
