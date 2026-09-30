@@ -26,6 +26,13 @@ public class Interfaz {
     static boolean servidorIniciado = false;
 
 
+    // =========================================================
+    // REGISTRO DE TARJETAS
+    // =========================================================
+
+    static VentanaEscaneoTarjetas ventanaEscaneo;
+
+
     public static void main(String[] args) {
 
         JFrame ventana = new JFrame("MONOPOLY CR");
@@ -53,6 +60,25 @@ public class Interfaz {
             cliente = null;
 
         }
+
+
+        // =========================================================
+        // ESCUCHAR TARJETAS QUE LLEGAN DEL CAJERO
+        // =========================================================
+
+        ManejadorCajero.setListenerTarjeta(uid -> {
+
+            SwingUtilities.invokeLater(() -> {
+
+                if (ventanaEscaneo != null) {
+
+                    ventanaEscaneo.tarjetaEscaneada(uid);
+
+                }
+
+            });
+
+        });
 
 
         // =========================
@@ -588,13 +614,16 @@ public class Interfaz {
                         JOptionPane.INFORMATION_MESSAGE
                 );
 
+
                 // =================================================
-                // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
+                // REGISTRAR TARJETAS DE LOS DOS JUGADORES
                 // =================================================
 
-                abrirTablero();
-
-                ventanaPrincipal.dispose();
+                iniciarRegistroTarjetas(
+                        ventanaPrincipal,
+                        nombreJugador1,
+                        nombreJugador2
+                );
 
 
             } else {
@@ -617,6 +646,36 @@ public class Interfaz {
                     JOptionPane.ERROR_MESSAGE
             );
         }
+    }
+
+
+    // =========================================================
+    // REGISTRO DE TARJETAS
+    // =========================================================
+
+    public static void iniciarRegistroTarjetas(
+            JFrame ventanaPrincipal,
+            String nombreJugador1,
+            String nombreJugador2
+    ) {
+
+        ventanaEscaneo =
+                new VentanaEscaneoTarjetas(
+                        ventanaPrincipal,
+                        nombreJugador1,
+                        nombreJugador2,
+                        () -> {
+
+                            ventanaEscaneo = null;
+
+                            abrirTablero();
+
+                            ventanaPrincipal.dispose();
+                        }
+                );
+
+
+        ventanaEscaneo.setVisible(true);
     }
 
 
@@ -790,8 +849,9 @@ public class Interfaz {
                         JOptionPane.INFORMATION_MESSAGE
                 );
 
+
                 // =================================================
-                // ABRIR TABLERO CON LOS NOMBRES INGRESADOS
+                // ABRIR TABLERO
                 // =================================================
 
                 abrirTablero();
@@ -823,10 +883,6 @@ public class Interfaz {
 
 
     // =========================================================
-    // BOTÓN CON IMAGEN
-    // =========================================================
-
-    // =========================================================
     // ABRIR TABLERO
     // =========================================================
 
@@ -849,6 +905,10 @@ public class Interfaz {
         });
     }
 
+
+    // =========================================================
+    // BOTÓN CON IMAGEN
+    // =========================================================
 
     public static JButton crearBotonImagen(
             String ruta,
@@ -905,6 +965,7 @@ public class Interfaz {
                 )
         );
 
+
         boton.addMouseListener(
                 new MouseAdapter() {
 
@@ -952,7 +1013,374 @@ public class Interfaz {
                 }
         );
 
+
         return boton;
+    }
+
+
+    // =========================================================
+    // VENTANA PARA ESCANEAR TARJETAS
+    // =========================================================
+
+    static class VentanaEscaneoTarjetas extends JDialog {
+
+        private final String nombreJugador1;
+        private final String nombreJugador2;
+
+        private String tarjetaJugador1;
+        private String tarjetaJugador2;
+
+        private int jugadorActual = 1;
+
+        private final JLabel etiquetaJugador;
+        private final JLabel etiquetaEstado;
+
+        private final Runnable alTerminar;
+
+
+        public VentanaEscaneoTarjetas(
+                JFrame padre,
+                String nombreJugador1,
+                String nombreJugador2,
+                Runnable alTerminar
+        ) {
+
+            super(
+                    padre,
+                    "Registro de tarjetas",
+                    false
+            );
+
+
+            this.nombreJugador1 = nombreJugador1;
+            this.nombreJugador2 = nombreJugador2;
+            this.alTerminar = alTerminar;
+
+
+            // =====================================================
+            // CONFIGURACIÓN DE LA VENTANA
+            // =====================================================
+
+            setSize(
+                    500,
+                    300
+            );
+
+            setLocationRelativeTo(padre);
+
+            setResizable(false);
+
+            setDefaultCloseOperation(
+                    JDialog.DO_NOTHING_ON_CLOSE
+            );
+
+
+            // =====================================================
+            // PANEL PRINCIPAL
+            // =====================================================
+
+            JPanel panelPrincipal =
+                    new JPanel(
+                            new BorderLayout()
+                    );
+
+            panelPrincipal.setBorder(
+                    BorderFactory.createEmptyBorder(
+                            30,
+                            30,
+                            30,
+                            30
+                    )
+            );
+
+
+            // =====================================================
+            // TÍTULO
+            // =====================================================
+
+            JLabel titulo =
+                    new JLabel(
+                            "REGISTRO DE TARJETAS",
+                            SwingConstants.CENTER
+                    );
+
+            titulo.setFont(
+                    new Font(
+                            "Arial",
+                            Font.BOLD,
+                            24
+                    )
+            );
+
+
+            panelPrincipal.add(
+                    titulo,
+                    BorderLayout.NORTH
+            );
+
+
+            // =====================================================
+            // CENTRO
+            // =====================================================
+
+            JPanel centro =
+                    new JPanel();
+
+            centro.setLayout(
+                    new BoxLayout(
+                            centro,
+                            BoxLayout.Y_AXIS
+                    )
+            );
+
+
+            centro.setBorder(
+                    BorderFactory.createEmptyBorder(
+                            40,
+                            10,
+                            10,
+                            10
+                    )
+            );
+
+
+            etiquetaJugador =
+                    new JLabel(
+                            "",
+                            SwingConstants.CENTER
+                    );
+
+
+            etiquetaJugador.setFont(
+                    new Font(
+                            "Arial",
+                            Font.BOLD,
+                            20
+                    )
+            );
+
+
+            etiquetaJugador.setAlignmentX(
+                    Component.CENTER_ALIGNMENT
+            );
+
+
+            etiquetaEstado =
+                    new JLabel(
+                            "Acerque la tarjeta al lector RFID",
+                            SwingConstants.CENTER
+                    );
+
+
+            etiquetaEstado.setFont(
+                    new Font(
+                            "Arial",
+                            Font.PLAIN,
+                            16
+                    )
+            );
+
+
+            etiquetaEstado.setAlignmentX(
+                    Component.CENTER_ALIGNMENT
+            );
+
+
+            centro.add(etiquetaJugador);
+
+            centro.add(
+                    Box.createVerticalStrut(25)
+            );
+
+            centro.add(etiquetaEstado);
+
+
+            panelPrincipal.add(
+                    centro,
+                    BorderLayout.CENTER
+            );
+
+
+            add(panelPrincipal);
+
+
+            // =====================================================
+            // MOSTRAR JUGADOR 1
+            // =====================================================
+
+            actualizarJugador();
+        }
+
+
+        // =========================================================
+        // ACTUALIZAR TEXTO
+        // =========================================================
+
+        private void actualizarJugador() {
+
+            if (jugadorActual == 1) {
+
+                etiquetaJugador.setText(
+                        "Jugador 1 - "
+                                + nombreJugador1
+                                + ": escanee su tarjeta"
+                );
+
+            } else {
+
+                etiquetaJugador.setText(
+                        "Jugador 2 - "
+                                + nombreJugador2
+                                + ": escanee su tarjeta"
+                );
+
+            }
+
+
+            etiquetaEstado.setText(
+                    "Acerque la tarjeta al lector RFID"
+            );
+        }
+
+
+        // =========================================================
+        // TARJETA RECIBIDA DESDE EL CAJERO
+        // =========================================================
+
+        public void tarjetaEscaneada(
+                String uid
+        ) {
+
+            if (uid == null
+                    || uid.trim().isEmpty()) {
+
+                return;
+            }
+
+
+            uid = uid.trim();
+
+
+            // =====================================================
+            // JUGADOR 1
+            // =====================================================
+
+            if (jugadorActual == 1) {
+
+                tarjetaJugador1 = uid;
+
+
+                System.out.println(
+                        "Tarjeta del Jugador 1 ("
+                                + nombreJugador1
+                                + "): "
+                                + tarjetaJugador1
+                );
+
+
+                etiquetaEstado.setText(
+                        "Tarjeta registrada correctamente."
+                );
+
+
+                jugadorActual = 2;
+
+
+                Timer timer =
+                        new Timer(
+                                800,
+                                e -> actualizarJugador()
+                        );
+
+
+                timer.setRepeats(false);
+
+                timer.start();
+
+                return;
+            }
+
+
+            // =====================================================
+            // JUGADOR 2
+            // =====================================================
+
+            if (jugadorActual == 2) {
+
+                // No permitir la misma tarjeta para ambos jugadores
+
+                if (uid.equalsIgnoreCase(
+                        tarjetaJugador1
+                )) {
+
+                    etiquetaEstado.setText(
+                            "Esta tarjeta ya pertenece al Jugador 1. Escanee otra."
+                    );
+
+                    return;
+                }
+
+
+                tarjetaJugador2 = uid;
+
+
+                System.out.println(
+                        "Tarjeta del Jugador 2 ("
+                                + nombreJugador2
+                                + "): "
+                                + tarjetaJugador2
+                );
+
+
+                etiquetaEstado.setText(
+                        "Tarjeta registrada correctamente."
+                );
+
+
+                jugadorActual = 3;
+
+
+                // =================================================
+                // TERMINAR REGISTRO
+                // =================================================
+
+                Timer timer =
+                        new Timer(
+                                800,
+                                e -> {
+
+                                    dispose();
+
+                                    if (alTerminar != null) {
+
+                                        alTerminar.run();
+
+                                    }
+                                }
+                        );
+
+
+                timer.setRepeats(false);
+
+                timer.start();
+            }
+        }
+
+
+        // =========================================================
+        // GETTERS DE LAS TARJETAS
+        // =========================================================
+
+        public String getTarjetaJugador1() {
+
+            return tarjetaJugador1;
+        }
+
+
+        public String getTarjetaJugador2() {
+
+            return tarjetaJugador2;
+        }
     }
 }
 
@@ -1002,7 +1430,9 @@ class PanelFondo extends JPanel {
                 this
         );
 
+
         // Oscurecer ligeramente el fondo
+
         g2.setColor(
                 new Color(
                         0,
@@ -1011,6 +1441,7 @@ class PanelFondo extends JPanel {
                         80
                 )
         );
+
 
         g2.fillRect(
                 0,
