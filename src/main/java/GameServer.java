@@ -284,6 +284,14 @@ public class GameServer {
                     terminarTurno(playerId, out);
                 }
 
+                else if (mensaje instanceof Message.ConsultarTransacciones consulta) {
+                    consultarTransacciones(playerId, out, consulta, false);
+                }
+
+                else if (mensaje instanceof Message.ExportarTransacciones) {
+                    consultarTransacciones(playerId, out, null, true);
+                }
+
 
                 // =================================================
                 // MOVIMIENTO ORIGINAL
@@ -1216,7 +1224,49 @@ public class GameServer {
     }
 
     // Foto de la partida que se manda a los clientes
+    /** Consultar y exportar no cambian el juego y se permiten incluso al finalizar. */
+    private void consultarTransacciones(int computadora, ObjectOutputStream out,
+            Message.ConsultarTransacciones consulta, boolean exportacion) throws IOException {
+        synchronized (gameLock) {
+            boolean participante = false;
+            for (int propietario : computadoraDe) {
+                if (propietario == computadora) participante = true;
+            }
+            if (juego == null || !participante) {
+                escribir(out, new Message.Aviso("No hay una partida disponible para consultar."));
+                return;
+            }
+            String jugador = consulta == null ? null : consulta.jugador();
+            modelo.TipoTransaccion tipo = null;
+            if (consulta != null && consulta.tipo() != null) {
+                try {
+                    tipo = modelo.TipoTransaccion.valueOf(consulta.tipo());
+                } catch (IllegalArgumentException e) {
+                    escribir(out, new Message.Aviso("Tipo de transaccion desconocido."));
+                    return;
+                }
+            }
+            if (jugador != null && !modelo.Transaccion.ID_BANCO.equals(jugador)) {
+                boolean existe = false;
+                for (Jugador registrado : jugadores) {
+                    if (registrado != null && registrado.getId().equals(jugador)) existe = true;
+                }
+                if (!existe) {
+                    escribir(out, new Message.Aviso("Jugador desconocido."));
+                    return;
+                }
+            }
+            modelo.RegistroTransacciones registro = juego.getRegistroTransacciones();
+            String texto = exportacion ? registro.exportar()
+                    : registro.consultar(jugador, tipo, consulta.recientesPrimero());
+            escribir(out, new Message.HistorialTransacciones(texto,
+                    registro.getArchivo().getFileName().toString(), exportacion));
+        }
+    }
+
     private Message.EstadoJuego crearEstado() {
+        String errorHistorial = juego.getRegistroTransacciones().getErrorEscritura();
+        if (errorHistorial != null) difundir(new Message.Aviso(errorHistorial));
 
         String[] nombres = new String[4];
         int[] saldos = new int[4];

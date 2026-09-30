@@ -40,7 +40,10 @@ public class Juego {
     // Agrega un jugador a la cola circular de turnos
     public void agregarJugador(Jugador jugador) {
         this.colaTurnos.encolar(jugador);
-        registro.registrar(jugador, "SALDO INICIAL", "Ingreso a la partida", 0);
+        if (jugador.getSaldo() > 0) {
+            registro.registrar(TipoTransaccion.SALDO_INICIAL, null, jugador, jugador.getSaldo(),
+                    "Asignacion inicial de dinero", banco.getSaldo(), banco.getSaldo(), 0, jugador.getSaldo());
+        }
     }
 
     // Asigna el tablero con sus casillas/propiedades enlazadas
@@ -76,6 +79,7 @@ public class Juego {
     public void terminarTurnoActual() {
         colaTurnos.pasarTurno();
         this.turnoActualGlobal++;
+        registro.setTurno(turnoActualGlobal);
 
         // Verifica si la partida debe terminar por limite de turnos o bancarrota general
         if (this.turnoActualGlobal > this.maxTurnos || colaTurnos.contarJugadoresActivos() <= 1) {
@@ -107,6 +111,10 @@ public class Juego {
     // Retorna el contador del turno global
     public int getTurnoActualGlobal() {
         return turnoActualGlobal;
+    }
+
+    public RegistroTransacciones getRegistroTransacciones() {
+        return registro;
     }
 
     public java.nio.file.Path getArchivoTransacciones() {
