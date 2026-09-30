@@ -1,3 +1,9 @@
+import protocolo.Message;
+import modelo.Casilla;
+import modelo.Juego;
+import modelo.Jugador;
+import modelo.Propiedad;
+import modelo.Tablero;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -51,6 +57,33 @@ public class GameServer {
     private int score1 = 0;
 
     private final Object gameLock = new Object();
+
+
+    // =========================================================
+    // PARTIDA DE MONOPOLY (vive SOLO aqui, los clientes solo la dibujan)
+    // =========================================================
+
+    // Salida de cada computadora (indice = playerId). Sirve para
+    // mandarles mensajes sin que los pidan: dados, avisos, estado.
+    private final ObjectOutputStream[] salidas =
+            new ObjectOutputStream[2];
+
+    private static final int MAX_TURNOS = 100;
+    private static final int SALDO_INICIAL = 1500000;
+
+    // null mientras no se hayan unido las 2 computadoras
+    private Juego juego;
+    private Tablero tablero;
+
+    // Los 4 jugadores en orden de turno. Juego los guarda en su cola,
+    // pero no deja recorrerlos, y el estado necesita los 4.
+    private final Jugador[] jugadores = new Jugador[4];
+
+    // jugadores[i] se juega desde la computadora computadoraDe[i]
+    private final int[] computadoraDe = new int[4];
+
+    // Fase del turno: false = esperando dados, true = ya se movio
+    private boolean yaTiro = false;
 
 
     // =========================================================
@@ -150,6 +183,9 @@ public class GameServer {
 
             out.flush();
 
+            // Desde aqui el servidor le puede escribir cuando quiera
+            salidas[playerId] = out;
+
 
             while (true) {
 
@@ -196,6 +232,7 @@ public class GameServer {
                     crearPartida(
                             crear.jugador1(),
                             crear.jugador2(),
+                            playerId,
                             out
                     );
                 }
@@ -211,8 +248,29 @@ public class GameServer {
                             entrar.codigo(),
                             entrar.jugador1(),
                             entrar.jugador2(),
+                            playerId,
                             out
                     );
+                }
+
+
+                // =================================================
+                // ACCIONES DE LA PARTIDA (el cliente solo pide)
+                // =================================================
+
+                else if (mensaje instanceof Message.TirarDadosPrueba) {
+
+                    tirarDadosPrueba(playerId, out);
+                }
+
+                else if (mensaje instanceof Message.ComprarPropiedad) {
+
+                    comprarPropiedad(playerId, out);
+                }
+
+                else if (mensaje instanceof Message.TerminarTurno) {
+
+                    terminarTurno(playerId, out);
                 }
 
 
@@ -236,13 +294,12 @@ public class GameServer {
 
                 else if (mensaje instanceof Message.Ping ping) {
 
-                    out.writeObject(
+                    escribir(
+                            out,
                             new Message.Pong(
                                     ping.timestamp()
                             )
                     );
-
-                    out.flush();
                 }
             }
 
@@ -396,6 +453,7 @@ public class GameServer {
     private void crearPartida(
             String jugador1,
             String jugador2,
+            int computadora,
             ObjectOutputStream out
     ) throws IOException {
 
@@ -473,6 +531,9 @@ public class GameServer {
                         jugador2
                 );
 
+        partida.computadoraCreadora =
+                computadora;
+
         partidas.put(
                 codigo,
                 partida
@@ -505,6 +566,7 @@ public class GameServer {
             String codigo,
             String jugador1,
             String jugador2,
+            int computadora,
             ObjectOutputStream out
     ) throws IOException {
 
@@ -611,6 +673,9 @@ public class GameServer {
         partida.jugador4 =
                 jugador2;
 
+        partida.computadoraInvitada =
+                computadora;
+
 
         System.out.println(
                 "Partida "
@@ -644,6 +709,9 @@ public class GameServer {
                 "GAME_JOINED",
                 "Partida unida correctamente."
         );
+
+        // Ya estan los 4: arranca la partida en el servidor
+        iniciarJuego(partida);
     }
 
 
@@ -700,14 +768,13 @@ public class GameServer {
             String mensaje
     ) throws IOException {
 
-        out.writeObject(
+        escribir(
+                out,
                 new Message.Response(
                         tipo,
                         mensaje
                 )
         );
-
-        out.flush();
     }
 
 
@@ -760,10 +827,389 @@ public class GameServer {
                             score1
                     );
 
-            out.writeObject(estado);
+            escribir(out, estado);
+        }
+    }
+
+
+    // =========================================================
+    // ESCRIBIR A UN CLIENTE / A TODOS
+    // =========================================================
+
+    // Al mismo 'out' le pueden escribir dos hilos: el de esa computadora
+    // (respuestas) y el del cajero (dados). synchronized(out) hace que
+    // escriban de uno en uno; si no, los bytes se mezclan y el stream
+    // se corrompe.
+    private void escribir(
+            ObjectOutputStream out,
+            Message mensaje
+    ) throws IOException {
+
+        synchronized (out) {
+
+            out.writeObject(mensaje);
+
+            // ObjectOutputStream recuerda lo que ya mandó y a veces manda
+            // solo una "referencia". reset() lo obliga a olvidar, así cada
+            // EstadoJuego llega completo y con los datos nuevos.
+            out.reset();
 
             out.flush();
         }
+    }
+
+    // Manda el mismo mensaje a las 2 computadoras
+    private void difundir(
+            Message mensaje
+    ) {
+
+        for (ObjectOutputStream out : salidas) {
+
+            if (out == null) {
+                continue;
+            }
+
+            try {
+
+                escribir(out, mensaje);
+
+            } catch (IOException e) {
+
+                // Si una computadora se cayó, la otra sigue recibiendo
+                System.out.println(
+                        "No se pudo avisar a una computadora: "
+                                + e.getMessage()
+                );
+            }
+        }
+    }
+
+
+    // =========================================================
+    // PARTIDA: ARRANCAR
+    // =========================================================
+
+    // Se llama cuando la segunda computadora se une y ya hay 4 jugadores
+    private void iniciarJuego(
+            Partida partida
+    ) {
+
+        synchronized (gameLock) {
+
+            tablero = new Tablero();
+
+            juego = new Juego(MAX_TURNOS, 4);
+
+            String[] nombres = {
+                    partida.jugador1,
+                    partida.jugador2,
+                    partida.jugador3,
+                    partida.jugador4
+            };
+
+            for (int i = 0; i < 4; i++) {
+
+                jugadores[i] =
+                        new Jugador("J" + (i + 1), nombres[i], SALDO_INICIAL);
+
+                juego.agregarJugador(jugadores[i]);
+
+                // Jugadores 1 y 2 son de quien creó la partida, 3 y 4 de quien se unió
+                computadoraDe[i] =
+                        (i < 2)
+                                ? partida.computadoraCreadora
+                                : partida.computadoraInvitada;
+            }
+
+            yaTiro = false;
+
+            System.out.println(
+                    "Partida "
+                            + partida.codigo
+                            + " iniciada en el servidor."
+            );
+
+            difundir(new Message.Aviso(
+                    "¡Empieza la partida! Turno de "
+                            + juego.getJugadorActual().getNombre()
+                            + ". Tirá los dados en el cajero."
+            ));
+
+            difundir(crearEstado());
+        }
+    }
+
+
+    // =========================================================
+    // PARTIDA: DADOS (del cajero o de prueba)
+    // =========================================================
+
+    // Aplica una tirada al jugador en turno. Devuelve null si se usó,
+    // o un código de error si no se podía tirar en este momento.
+    // Hay que llamarlo teniendo gameLock.
+    private String aplicarDados(
+            int dado1,
+            int dado2
+    ) {
+
+        if (juego == null) {
+            return "NO_HAY_PARTIDA";
+        }
+
+        if (juego.esFinDeJuego()) {
+            return "PARTIDA_TERMINADA";
+        }
+
+        if (yaTiro) {
+            return "YA_TIRO";
+        }
+
+        if (dado1 < 1 || dado1 > 6
+                || dado2 < 1 || dado2 > 6) {
+            return "DADO_INVALIDO";
+        }
+
+        Jugador actual = juego.getJugadorActual();
+
+        int posicionAnterior = actual.getPosicionActual();
+
+        juego.ejecutarMovimientoJugadorActual(dado1 + dado2);
+
+        yaTiro = true;
+
+        Casilla casilla =
+                tablero.obtenerCasilla(actual.getPosicionActual());
+
+        // Primero los dados, para que los clientes los animen...
+        difundir(new Message.Dados(
+                indiceEnTurno(),
+                dado1,
+                dado2
+        ));
+
+        difundir(new Message.Aviso(
+                actual.getNombre()
+                        + " sacó [" + dado1 + "][" + dado2 + "] = "
+                        + (dado1 + dado2)
+                        + " y cae en "
+                        + casilla.getNombre()
+        ));
+
+        // Juego cobra la salida solo cuando la posición "da la vuelta"
+        if (actual.getPosicionActual() < posicionAnterior) {
+
+            difundir(new Message.Aviso(
+                    actual.getNombre() + " pasó por Salida y cobra."
+            ));
+        }
+
+        // ...y después cómo quedó todo
+        difundir(crearEstado());
+
+        return null;
+    }
+
+    private void tirarDadosPrueba(
+            int computadora,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            String error = validarTurno(computadora);
+
+            if (error != null) {
+                escribir(out, new Message.Aviso(error));
+                return;
+            }
+
+            int[] dados = juego.lanzarDadosSoftware();
+
+            String codigo = aplicarDados(dados[0], dados[1]);
+
+            if (codigo != null) {
+                escribir(out, new Message.Aviso(
+                        "No se pueden tirar los dados ahora (" + codigo + ")."
+                ));
+            }
+        }
+    }
+
+
+    // =========================================================
+    // PARTIDA: COMPRAR Y TERMINAR TURNO
+    // =========================================================
+
+    private void comprarPropiedad(
+            int computadora,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            String error = validarTurno(computadora);
+
+            if (error == null && !yaTiro) {
+                error = "Primero hay que tirar los dados.";
+            }
+
+            if (error != null) {
+                escribir(out, new Message.Aviso(error));
+                return;
+            }
+
+            Jugador actual = juego.getJugadorActual();
+
+            Casilla casilla =
+                    tablero.obtenerCasilla(actual.getPosicionActual());
+
+            if (!(casilla instanceof Propiedad propiedad)
+                    || propiedad.tienePropietario()) {
+
+                escribir(out, new Message.Aviso(
+                        "Esa casilla no se puede comprar."
+                ));
+                return;
+            }
+
+            if (!juego.getBanco().comprarPropiedad(actual, propiedad)) {
+
+                escribir(out, new Message.Aviso(
+                        "Saldo insuficiente para comprar "
+                                + propiedad.getNombre() + "."
+                ));
+                return;
+            }
+
+            difundir(new Message.Aviso(
+                    "¡" + actual.getNombre()
+                            + " compró " + propiedad.getNombre() + "!"
+            ));
+
+            difundir(crearEstado());
+        }
+    }
+
+    private void terminarTurno(
+            int computadora,
+            ObjectOutputStream out
+    ) throws IOException {
+
+        synchronized (gameLock) {
+
+            String error = validarTurno(computadora);
+
+            if (error == null && !yaTiro) {
+                error = "Todavía no se han tirado los dados.";
+            }
+
+            if (error != null) {
+                escribir(out, new Message.Aviso(error));
+                return;
+            }
+
+            juego.terminarTurnoActual();
+
+            yaTiro = false;
+
+            if (juego.esFinDeJuego()) {
+
+                difundir(new Message.Aviso(
+                        "¡La partida ha finalizado!"
+                ));
+
+            } else {
+
+                difundir(new Message.Aviso(
+                        "Turno de "
+                                + juego.getJugadorActual().getNombre()
+                                + ". Tirá los dados en el cajero."
+                ));
+            }
+
+            difundir(crearEstado());
+        }
+    }
+
+
+    // =========================================================
+    // PARTIDA: AYUDANTES
+    // =========================================================
+
+    // null si la computadora puede actuar; si no, el motivo
+    private String validarTurno(
+            int computadora
+    ) {
+
+        if (juego == null) {
+            return "La partida todavía no empezó.";
+        }
+
+        if (juego.esFinDeJuego()) {
+            return "La partida ya terminó.";
+        }
+
+        int enTurno = indiceEnTurno();
+
+        if (computadoraDe[enTurno] != computadora) {
+            return "No es tu turno: le toca a "
+                    + jugadores[enTurno].getNombre() + ".";
+        }
+
+        return null;
+    }
+
+    // Posición (0 a 3) del jugador en turno dentro de 'jugadores'
+    private int indiceEnTurno() {
+
+        Jugador actual = juego.getJugadorActual();
+
+        for (int i = 0; i < jugadores.length; i++) {
+
+            if (jugadores[i] == actual) {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    // Foto de la partida que se manda a los clientes
+    private Message.EstadoJuego crearEstado() {
+
+        String[] nombres = new String[4];
+        int[] saldos = new int[4];
+        int[] posiciones = new int[4];
+
+        for (int i = 0; i < 4; i++) {
+
+            nombres[i] = jugadores[i].getNombre();
+            saldos[i] = jugadores[i].getSaldo();
+            posiciones[i] = jugadores[i].getPosicionActual();
+        }
+
+        Casilla casillaActual =
+                tablero.obtenerCasilla(
+                        juego.getJugadorActual().getPosicionActual()
+                );
+
+        boolean puedeComprar =
+                yaTiro
+                        && casillaActual instanceof Propiedad propiedad
+                        && !propiedad.tienePropietario();
+
+        return new Message.EstadoJuego(
+                juego.getTurnoActualGlobal(),
+                juego.getMaxTurnos(),
+                indiceEnTurno(),
+                nombres,
+                saldos,
+                posiciones,
+                computadoraDe.clone(),
+                yaTiro,
+                puedeComprar,
+                juego.esFinDeJuego()
+        );
     }
 
 
@@ -822,7 +1268,9 @@ public class GameServer {
 
     // Lo llama ManejadorCajero cada vez que la Pico manda DADOS;d1;d2.
     // Corre en el hilo del cajero, por eso se protege con gameLock.
-    public void recibirDadosDelCajero(
+    // Devuelve null si los dados se usaron, o un código de error
+    // (NO_HAY_PARTIDA, YA_TIRO, ...) para contestarle a la Pico.
+    public String recibirDadosDelCajero(
             int dado1,
             int dado2
     ) {
@@ -838,8 +1286,13 @@ public class GameServer {
                             + (dado1 + dado2)
             );
 
-            // AQUI: llamar el metodo que ya tienen para usar los dados.
-            // Ejemplo: moverJugadorEnTurno(dado1 + dado2);
+            String error = aplicarDados(dado1, dado2);
+
+            if (error != null) {
+                System.out.println("[CAJERO] Dados rechazados: " + error);
+            }
+
+            return error;
         }
     }
 
@@ -903,6 +1356,10 @@ public class GameServer {
 
         String jugador3;
         String jugador4;
+
+        // Desde que computadora se juegan jugador1-2 y jugador3-4
+        int computadoraCreadora;
+        int computadoraInvitada;
 
 
         Partida(
