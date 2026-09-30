@@ -263,10 +263,10 @@ public class VentanaTablero extends JFrame {
         StringBuilder lista = new StringBuilder("<html>");
         for (int i = 0; i < estado.nombres().length; i++) {
             lista.append(i == enTurno ? "▶ " : "&nbsp;&nbsp;&nbsp;")
-                 .append(estado.nombres()[i])
-                 .append(" — ₡").append(estado.saldos()[i])
-                 .append(" — casilla ").append(estado.posiciones()[i])
-                 .append("<br>");
+                    .append(estado.nombres()[i])
+                    .append(" — ₡").append(estado.saldos()[i])
+                    .append(" — casilla ").append(estado.posiciones()[i])
+                    .append("<br>");
         }
         etiquetaJugadores.setText(lista.append("</html>").toString());
 
@@ -287,6 +287,12 @@ public class VentanaTablero extends JFrame {
         botonLanzarDados.setEnabled(esMiTurno && !estado.yaTiro());
         botonComprar.setEnabled(esMiTurno && estado.puedeComprar());
         botonTerminarTurno.setEnabled(esMiTurno && estado.yaTiro());
+
+        // Fichas: si alguna cambió de casilla, el panel la hace caminar hasta ahí.
+        // Como aplicarEstado se llama cuando terminan de girar los dados, las
+        // fichas se mueven justo después de ver el resultado.
+        panelTablero.actualizarFichas(estado.posiciones(), estado.nombres(),
+                estado.terminado() ? -1 : enTurno);
 
         panelTablero.repaint();
 
