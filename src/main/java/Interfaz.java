@@ -66,19 +66,7 @@ public class Interfaz {
         // ESCUCHAR TARJETAS QUE LLEGAN DEL CAJERO
         // =========================================================
 
-        ManejadorCajero.setListenerTarjeta(uid -> {
-
-            SwingUtilities.invokeLater(() -> {
-
-                if (ventanaEscaneo != null) {
-
-                    ventanaEscaneo.tarjetaEscaneada(uid);
-
-                }
-
-            });
-
-        });
+        configurarEscuchaTarjetas();
 
 
         // =========================
@@ -350,6 +338,8 @@ public class Interfaz {
 
 
             cliente.conectar();
+
+            configurarEscuchaTarjetas();
 
 
             JOptionPane.showMessageDialog(
@@ -650,6 +640,28 @@ public class Interfaz {
 
 
     // =========================================================
+    // ESCUCHA DE TARJETAS RFID
+    // =========================================================
+
+    private static void configurarEscuchaTarjetas() {
+
+        if (cliente == null) {
+            return;
+        }
+
+        cliente.setOyenteTarjeta(resultado -> {
+
+            SwingUtilities.invokeLater(() -> {
+
+                if (ventanaEscaneo != null) {
+                    ventanaEscaneo.tarjetaEscaneada(resultado);
+                }
+            });
+        });
+    }
+
+
+    // =========================================================
     // REGISTRO DE TARJETAS
     // =========================================================
 
@@ -851,12 +863,14 @@ public class Interfaz {
 
 
                 // =================================================
-                // ABRIR TABLERO
+                // REGISTRAR TARJETAS DE LOS DOS JUGADORES
                 // =================================================
 
-                abrirTablero();
-
-                ventanaPrincipal.dispose();
+                iniciarRegistroTarjetas(
+                        ventanaPrincipal,
+                        nombreJugador1,
+                        nombreJugador2
+                );
 
 
             } else {
@@ -1209,6 +1223,8 @@ public class Interfaz {
             // =====================================================
 
             actualizarJugador();
+
+            cliente.solicitarRegistroTarjeta(0);
         }
 
 
@@ -1248,27 +1264,24 @@ public class Interfaz {
         // =========================================================
 
         public void tarjetaEscaneada(
-                String uid
+                Message.TarjetaRegistrada resultado
         ) {
 
-            if (uid == null
-                    || uid.trim().isEmpty()) {
-
+            if (resultado == null) {
                 return;
             }
 
+            if (!resultado.correcta()) {
+                etiquetaEstado.setText(resultado.mensaje());
+                cliente.solicitarRegistroTarjeta(jugadorActual - 1);
+                return;
+            }
 
-            uid = uid.trim();
+            String uid = resultado.uid();
 
-
-            // =====================================================
-            // JUGADOR 1
-            // =====================================================
-
-            if (jugadorActual == 1) {
+            if (jugadorActual == 1 && resultado.indiceLocal() == 0) {
 
                 tarjetaJugador1 = uid;
-
 
                 System.out.println(
                         "Tarjeta del Jugador 1 ("
@@ -1277,52 +1290,28 @@ public class Interfaz {
                                 + tarjetaJugador1
                 );
 
-
                 etiquetaEstado.setText(
                         "Tarjeta registrada correctamente."
                 );
 
-
                 jugadorActual = 2;
 
-
-                Timer timer =
-                        new Timer(
-                                800,
-                                e -> actualizarJugador()
-                        );
-
+                Timer timer = new Timer(
+                        800,
+                        e -> {
+                            actualizarJugador();
+                            cliente.solicitarRegistroTarjeta(1);
+                        }
+                );
 
                 timer.setRepeats(false);
-
                 timer.start();
-
                 return;
             }
 
-
-            // =====================================================
-            // JUGADOR 2
-            // =====================================================
-
-            if (jugadorActual == 2) {
-
-                // No permitir la misma tarjeta para ambos jugadores
-
-                if (uid.equalsIgnoreCase(
-                        tarjetaJugador1
-                )) {
-
-                    etiquetaEstado.setText(
-                            "Esta tarjeta ya pertenece al Jugador 1. Escanee otra."
-                    );
-
-                    return;
-                }
-
+            if (jugadorActual == 2 && resultado.indiceLocal() == 1) {
 
                 tarjetaJugador2 = uid;
-
 
                 System.out.println(
                         "Tarjeta del Jugador 2 ("
@@ -1331,37 +1320,24 @@ public class Interfaz {
                                 + tarjetaJugador2
                 );
 
-
                 etiquetaEstado.setText(
                         "Tarjeta registrada correctamente."
                 );
 
-
                 jugadorActual = 3;
 
+                Timer timer = new Timer(
+                        800,
+                        e -> {
+                            dispose();
 
-                // =================================================
-                // TERMINAR REGISTRO
-                // =================================================
-
-                Timer timer =
-                        new Timer(
-                                800,
-                                e -> {
-
-                                    dispose();
-
-                                    if (alTerminar != null) {
-
-                                        alTerminar.run();
-
-                                    }
-                                }
-                        );
-
+                            if (alTerminar != null) {
+                                alTerminar.run();
+                            }
+                        }
+                );
 
                 timer.setRepeats(false);
-
                 timer.start();
             }
         }

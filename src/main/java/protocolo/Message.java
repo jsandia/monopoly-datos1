@@ -19,7 +19,9 @@ public sealed interface Message extends Serializable
         Message.TerminarTurno,
         Message.Dados,
         Message.Aviso,
-        Message.EstadoJuego {
+        Message.EstadoJuego,
+        Message.SolicitarRegistroTarjeta,
+        Message.TarjetaRegistrada {
 
     // =========================================================
     // MENSAJES ORIGINALES
@@ -102,6 +104,9 @@ public sealed interface Message extends Serializable
 
     record TerminarTurno() implements Message {}
 
+    /** Indica que uno de los dos jugadores de esta computadora espera registrar RFID. */
+    record SolicitarRegistroTarjeta(int indiceLocal) implements Message {}
+
 
     // =========================================================
     // PARTIDA: SERVIDOR -> TODOS LOS CLIENTES
@@ -117,6 +122,14 @@ public sealed interface Message extends Serializable
     /** Una línea para el "Registro de Partida" (o un error solo para quien lo causó). */
     record Aviso(
             String texto
+    ) implements Message {}
+
+    /** Confirmación del servidor de la tarjeta asignada al jugador local 0 o 1. */
+    record TarjetaRegistrada(
+            int indiceLocal,
+            String uid,
+            boolean correcta,
+            String mensaje
     ) implements Message {}
 
     /**
