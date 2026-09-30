@@ -14,6 +14,9 @@ public class Jugador {
     private int posicionActual;
     private boolean activo;
 
+    // Tarjeta RFID asociada a este jugador.
+    private String uidTarjeta;
+
     // Lista enlazada propia para almacenar sus propiedades
     private ListaPropiedades propiedades;
 
@@ -24,7 +27,32 @@ public class Jugador {
         this.saldo = saldoInicial;
         this.posicionActual = 0;
         this.activo = true;
+        this.uidTarjeta = null;
         this.propiedades = new ListaPropiedades();
+    }
+
+    // =========================================================
+    // TARJETA RFID
+    // =========================================================
+
+    public void registrarTarjeta(String uid) {
+        if (uid != null && !uid.trim().isEmpty()) {
+            this.uidTarjeta = uid.trim().toUpperCase();
+        }
+    }
+
+    public String getUidTarjeta() {
+        return uidTarjeta;
+    }
+
+    public boolean tieneTarjetaRegistrada() {
+        return uidTarjeta != null && !uidTarjeta.isEmpty();
+    }
+
+    public boolean validarTarjeta(String uid) {
+        return uidTarjeta != null
+                && uid != null
+                && uidTarjeta.equalsIgnoreCase(uid.trim());
     }
 
     // Suma un monto al saldo del jugador
