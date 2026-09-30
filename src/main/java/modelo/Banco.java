@@ -781,4 +781,19 @@ public class Banco {
 
         return true;
     }
+
+
+    // =========================================================
+    // PAGOS CON TARJETA RFID
+    // =========================================================
+
+    private boolean validarTarjetaPago(Jugador jugador, String uid) {
+        return jugador != null && jugador.validarTarjeta(uid);
+    }
+
+    public boolean comprarPropiedadConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
+        if (!validarTarjetaPago(jugador, uid)) return false;
+        return comprarPropiedad(jugador, propiedad);
+    }
+
 }

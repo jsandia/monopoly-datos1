@@ -66,19 +66,6 @@ public class Interfaz {
         // ESCUCHAR TARJETAS QUE LLEGAN DEL CAJERO
         // =========================================================
 
-        ManejadorCajero.setListenerTarjeta(uid -> {
-
-            SwingUtilities.invokeLater(() -> {
-
-                if (ventanaEscaneo != null) {
-
-                    ventanaEscaneo.tarjetaEscaneada(uid);
-
-                }
-
-            });
-
-        });
 
 
         // =========================
@@ -675,7 +662,49 @@ public class Interfaz {
                 );
 
 
+        // Durante el registro, usamos el oyente normal que ya existía
+        // en GameClient. Al abrir el tablero, abrirTablero() lo reemplaza.
+        cliente.setOyente(mensaje -> {
+            if (!(mensaje instanceof Message.Aviso aviso)) return;
+
+            String texto = aviso.texto();
+            if (texto == null || !texto.startsWith("__RFID__;")) return;
+
+            String[] partes = texto.split(";", 5);
+            if (partes.length < 5) return;
+
+            try {
+                int indiceLocal = Integer.parseInt(partes[1]);
+                boolean correcta = Boolean.parseBoolean(partes[2]);
+                String uid = partes[3];
+                String mensajeResultado = partes[4];
+
+                SwingUtilities.invokeLater(() -> {
+                    if (ventanaEscaneo != null) {
+                        ventanaEscaneo.tarjetaEscaneada(
+                                indiceLocal, correcta, uid, mensajeResultado
+                        );
+                    }
+                });
+            } catch (NumberFormatException ignored) {
+            }
+        });
+
         ventanaEscaneo.setVisible(true);
+        solicitarTarjetaRFID(0);
+    }
+
+    private static void solicitarTarjetaRFID(int indiceLocal) {
+        if (cliente == null) return;
+
+        cliente.enviarAccion(
+                new Message.PlayerMove(
+                        cliente.getPlayerId(),
+                        0,
+                        0,
+                        "RFID_REGISTRAR_" + indiceLocal
+                )
+        );
     }
 
 
@@ -851,12 +880,14 @@ public class Interfaz {
 
 
                 // =================================================
-                // ABRIR TABLERO
+                // REGISTRAR TARJETAS DE LOS DOS JUGADORES
                 // =================================================
 
-                abrirTablero();
-
-                ventanaPrincipal.dispose();
+                iniciarRegistroTarjetas(
+                        ventanaPrincipal,
+                        nombreJugador1,
+                        nombreJugador2
+                );
 
 
             } else {
@@ -1248,124 +1279,55 @@ public class Interfaz {
         // =========================================================
 
         public void tarjetaEscaneada(
-                String uid
+                int indiceLocal,
+                boolean correcta,
+                String uid,
+                String mensaje
         ) {
 
-            if (uid == null
-                    || uid.trim().isEmpty()) {
-
+            if (!correcta) {
+                etiquetaEstado.setText(mensaje);
+                solicitarTarjetaRFID(jugadorActual - 1);
                 return;
             }
 
+            if (uid == null || uid.trim().isEmpty()) {
+                return;
+            }
 
             uid = uid.trim();
 
-
-            // =====================================================
-            // JUGADOR 1
-            // =====================================================
-
-            if (jugadorActual == 1) {
+            if (jugadorActual == 1 && indiceLocal == 0) {
 
                 tarjetaJugador1 = uid;
-
-
-                System.out.println(
-                        "Tarjeta del Jugador 1 ("
-                                + nombreJugador1
-                                + "): "
-                                + tarjetaJugador1
-                );
-
-
-                etiquetaEstado.setText(
-                        "Tarjeta registrada correctamente."
-                );
-
-
+                etiquetaEstado.setText("Tarjeta registrada correctamente.");
                 jugadorActual = 2;
 
-
-                Timer timer =
-                        new Timer(
-                                800,
-                                e -> actualizarJugador()
-                        );
-
-
+                Timer timer = new Timer(800, e -> {
+                    actualizarJugador();
+                    solicitarTarjetaRFID(1);
+                });
                 timer.setRepeats(false);
-
                 timer.start();
-
                 return;
             }
 
-
-            // =====================================================
-            // JUGADOR 2
-            // =====================================================
-
-            if (jugadorActual == 2) {
-
-                // No permitir la misma tarjeta para ambos jugadores
-
-                if (uid.equalsIgnoreCase(
-                        tarjetaJugador1
-                )) {
-
-                    etiquetaEstado.setText(
-                            "Esta tarjeta ya pertenece al Jugador 1. Escanee otra."
-                    );
-
-                    return;
-                }
-
+            if (jugadorActual == 2 && indiceLocal == 1) {
 
                 tarjetaJugador2 = uid;
-
-
-                System.out.println(
-                        "Tarjeta del Jugador 2 ("
-                                + nombreJugador2
-                                + "): "
-                                + tarjetaJugador2
-                );
-
-
-                etiquetaEstado.setText(
-                        "Tarjeta registrada correctamente."
-                );
-
-
+                etiquetaEstado.setText("Tarjeta registrada correctamente.");
                 jugadorActual = 3;
 
-
-                // =================================================
-                // TERMINAR REGISTRO
-                // =================================================
-
-                Timer timer =
-                        new Timer(
-                                800,
-                                e -> {
-
-                                    dispose();
-
-                                    if (alTerminar != null) {
-
-                                        alTerminar.run();
-
-                                    }
-                                }
-                        );
-
-
+                Timer timer = new Timer(800, e -> {
+                    dispose();
+                    if (alTerminar != null) {
+                        alTerminar.run();
+                    }
+                });
                 timer.setRepeats(false);
-
                 timer.start();
             }
         }
-
 
         // =========================================================
         // GETTERS DE LAS TARJETAS
