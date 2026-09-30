@@ -7,6 +7,7 @@ import modelo.Propiedad;
 import modelo.Tablero;
 
 import javax.swing.JPanel;
+import javax.swing.Timer;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -50,6 +51,29 @@ public class PanelTablero extends JPanel {
     private int dado2 = 1;
     private boolean mostrandoDados = false;
 
+    // =========================================================
+    // FICHAS DE LOS JUGADORES
+    // =========================================================
+
+    private static final int CANTIDAD_JUGADORES = 4;
+    private static final int PASO_FICHA_MS = 230;   // tiempo que tarda la ficha en saltar de una casilla a la siguiente
+    private static final int MAX_PASOS_ANIMADOS = 12; // más que un tiro de dados: es un salto (ej. "Vaya a la cárcel")
+
+    private static final Color[] COLORES_FICHAS = {
+            new Color(0xE53935), // jugador 1: rojo
+            new Color(0x1E88E5), // jugador 2: azul
+            new Color(0x8E24AA), // jugador 3: morado
+            new Color(0x00897B)  // jugador 4: turquesa
+    };
+
+    // Casilla donde se DIBUJA cada ficha ahora mismo (-1 = todavía no se sabe)
+    private final int[] posicionVisible = {-1, -1, -1, -1};
+    // Casilla donde el servidor dice que está cada jugador
+    private final int[] posicionDestino = new int[CANTIDAD_JUGADORES];
+    private final String[] nombresJugadores = {"1", "2", "3", "4"};
+    private int jugadorEnTurno = -1;
+    private Timer temporizadorFichas; // != null mientras alguna ficha está caminando
+
     // "Callback": quien use este panel registra aquí qué hacer cuando hay clic
     // en una casilla. Por defecto no hace nada (c -> { }) para evitar un null.
     private Consumer<Casilla> alSeleccionar = c -> { };
@@ -89,6 +113,58 @@ public class PanelTablero extends JPanel {
         this.mostrandoDados = true;
     }
 
+    /**
+     * Le dice al panel dónde está cada jugador según el servidor. Si una ficha
+     * está lejos de su destino, camina casilla por casilla (como en el juego
+     * real) con un Timer. La primera vez, o si el salto es mayor que lo que
+     * pueden avanzar los dados (ir a la cárcel, cartas...), aparece directo.
+     */
+    public void actualizarFichas(int[] posiciones, String[] nombres, int enTurno) {
+        jugadorEnTurno = enTurno;
+
+        for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+            if (nombres != null && nombres[i] != null && !nombres[i].isBlank()) {
+                nombresJugadores[i] = nombres[i].trim();
+            }
+
+            posicionDestino[i] = posiciones[i];
+
+            if (posicionVisible[i] < 0) {
+                posicionVisible[i] = posiciones[i]; // primera vez: sin animación
+            } else {
+                int pasos = Math.floorMod(posicionDestino[i] - posicionVisible[i], 40);
+                if (pasos > MAX_PASOS_ANIMADOS) {
+                    posicionVisible[i] = posicionDestino[i];
+                }
+            }
+        }
+
+        if (hayFichaCaminando() && temporizadorFichas == null) {
+            temporizadorFichas = new Timer(PASO_FICHA_MS, e -> {
+                for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+                    if (posicionVisible[i] != posicionDestino[i]) {
+                        posicionVisible[i] = (posicionVisible[i] + 1) % 40; // una casilla hacia adelante
+                    }
+                }
+                if (!hayFichaCaminando()) {
+                    temporizadorFichas.stop();
+                    temporizadorFichas = null;
+                }
+                repaint();
+            });
+            temporizadorFichas.start();
+        }
+
+        repaint();
+    }
+
+    private boolean hayFichaCaminando() {
+        for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+            if (posicionVisible[i] != posicionDestino[i]) return true;
+        }
+        return false;
+    }
+
     /** Deja de dibujar los dados (por ejemplo, al empezar el turno de otro jugador). */
     public void ocultarDados() {
         this.mostrandoDados = false;
@@ -125,6 +201,82 @@ public class PanelTablero extends JPanel {
         g2.setColor(BORDE);
         g2.setStroke(new BasicStroke(3));
         g2.drawRect(x0, y0, lado, lado);
+
+        // Las fichas van al final para quedar encima de las casillas
+        dibujarFichas(g2, w);
+    }
+
+    /**
+     * Dibuja las fichas. Los jugadores que están en la misma casilla se
+     * reparten en una mini-cuadrícula (máximo 2 por fila) centrada en la
+     * casilla, así nunca quedan una encima de otra.
+     */
+    private void dibujarFichas(Graphics2D g2, double w) {
+        int diametro = (int) Math.max(14, w * 0.42);
+        int separacion = (int) (diametro * 1.1);
+
+        for (int casilla = 0; casilla < 40; casilla++) {
+            if (rectangulos[casilla] == null) continue;
+
+            // Jugadores (por índice) que están dibujados en esta casilla
+            int[] aqui = new int[CANTIDAD_JUGADORES];
+            int cantidad = 0;
+            for (int j = 0; j < CANTIDAD_JUGADORES; j++) {
+                if (posicionVisible[j] == casilla) aqui[cantidad++] = j;
+            }
+            if (cantidad == 0) continue;
+
+            Rectangle r = rectangulos[casilla];
+            int columnas = (cantidad == 1) ? 1 : 2;
+            int filas = (cantidad + columnas - 1) / columnas;
+            int centroX = r.x + r.width / 2;
+            int centroY = r.y + r.height / 2;
+
+            for (int k = 0; k < cantidad; k++) {
+                int fila = k / columnas;
+                int columna = k % columnas;
+                // La última fila puede tener menos fichas: se centra
+                int enEstaFila = Math.min(columnas, cantidad - fila * columnas);
+
+                int cx = centroX + (int) ((columna - (enEstaFila - 1) / 2.0) * separacion);
+                int cy = centroY + (int) ((fila - (filas - 1) / 2.0) * separacion);
+
+                dibujarFicha(g2, cx, cy, diametro, aqui[k]);
+            }
+        }
+    }
+
+    /** Una ficha: círculo de color con sombra, borde blanco y la inicial del jugador. */
+    private void dibujarFicha(Graphics2D g2, int cx, int cy, int diametro, int jugador) {
+        int x = cx - diametro / 2;
+        int y = cy - diametro / 2;
+
+        // Sombra
+        g2.setColor(new Color(0, 0, 0, 70));
+        g2.fillOval(x + 2, y + 3, diametro, diametro);
+
+        // Cuerpo
+        g2.setColor(COLORES_FICHAS[jugador]);
+        g2.fillOval(x, y, diametro, diametro);
+
+        // Borde: dorado y más grueso si es el jugador en turno
+        boolean enTurno = (jugador == jugadorEnTurno);
+        g2.setStroke(new BasicStroke(enTurno ? 3f : 2f));
+        g2.setColor(enTurno ? RESALTADO : Color.WHITE);
+        g2.drawOval(x, y, diametro, diametro);
+        g2.setColor(BORDE);
+        g2.setStroke(new BasicStroke(1f));
+        g2.drawOval(x - 1, y - 1, diametro + 2, diametro + 2);
+
+        // Inicial del nombre
+        String inicial = nombresJugadores[jugador].substring(0, 1).toUpperCase();
+        Font fuente = new Font("SansSerif", Font.BOLD, Math.max(9, (int) (diametro * 0.55)));
+        g2.setFont(fuente);
+        FontMetrics fm = g2.getFontMetrics();
+        g2.setColor(Color.WHITE);
+        g2.drawString(inicial,
+                cx - fm.stringWidth(inicial) / 2,
+                cy + (fm.getAscent() - fm.getDescent()) / 2);
     }
 
     /** En qué lado del tablero está la casilla i. Define dónde va la franja de color. */
