@@ -5,11 +5,17 @@ import java.util.concurrent.*;
 
 public class GameServer {
 
-    public static final int DEFAULT_PORT = 5000;
+    // No usar 5000: en macOS lo ocupa el Receptor AirPlay (ControlCenter)
+    public static final int DEFAULT_PORT = 5100;
+
+    // Puerto aparte para el cajero (Pico 2W). Habla texto, no objetos Java
+    public static final int PUERTO_CAJERO = 5050;
 
     private final int port;
 
     private ServerSocket serverSocket;
+
+    private ServerSocket servidorCajero;
 
     private final ExecutorService pool =
             Executors.newFixedThreadPool(4);
@@ -75,6 +81,10 @@ public class GameServer {
         );
 
         Discovery.hostAnnounce(port);
+
+        // CAJERO: se abre ANTES del ciclo de abajo, porque ese ciclo
+        // se queda esperando en accept() hasta que lleguen las 2 computadoras
+        iniciarServidorCajero();
 
         System.out.println(
                 "Esperando 2 computadoras..."
@@ -758,6 +768,106 @@ public class GameServer {
 
 
     // =========================================================
+    // CAJERO (Pico 2W): SERVIDOR APARTE EN EL PUERTO 5050
+    // =========================================================
+
+    private void iniciarServidorCajero() {
+
+        // Hilo aparte: asi el accept() del cajero no bloquea
+        // el accept() de las computadoras
+        Thread hiloCajero = new Thread(() -> {
+
+            try {
+
+                servidorCajero = new ServerSocket(PUERTO_CAJERO);
+
+                System.out.println(
+                        "Esperando al cajero en el puerto "
+                                + PUERTO_CAJERO
+                );
+
+                while (true) {
+
+                    Socket socketCajero = servidorCajero.accept();
+
+                    System.out.println(
+                            "Cajero conectado desde "
+                                    + socketCajero.getInetAddress()
+                    );
+
+                    // 'this' es este GameServer: el manejador lo usa
+                    // para avisar cuando lleguen dados o tarjetas
+                    new Thread(
+                            new ManejadorCajero(socketCajero, this)
+                    ).start();
+                }
+
+            } catch (IOException e) {
+
+                // Tambien pasa al cerrar el servidor con stop(): es normal
+                System.out.println(
+                        "Servidor del cajero detenido: "
+                                + e.getMessage()
+                );
+            }
+        });
+
+        hiloCajero.start();
+    }
+
+
+    // =========================================================
+    // CAJERO: LLEGARON DADOS
+    // =========================================================
+
+    // Lo llama ManejadorCajero cada vez que la Pico manda DADOS;d1;d2.
+    // Corre en el hilo del cajero, por eso se protege con gameLock.
+    public void recibirDadosDelCajero(
+            int dado1,
+            int dado2
+    ) {
+
+        synchronized (gameLock) {
+
+            System.out.println(
+                    "[CAJERO] Dados: "
+                            + dado1
+                            + " + "
+                            + dado2
+                            + " = "
+                            + (dado1 + dado2)
+            );
+
+            // AQUI: llamar el metodo que ya tienen para usar los dados.
+            // Ejemplo: moverJugadorEnTurno(dado1 + dado2);
+        }
+    }
+
+
+    // =========================================================
+    // CAJERO: LLEGO UNA TARJETA
+    // =========================================================
+
+    // Lo llama ManejadorCajero cada vez que la Pico manda TARJETA;UID.
+    // El UID viene en hexadecimal, ej: "43B121A1".
+    public void recibirTarjetaDelCajero(
+            String uid
+    ) {
+
+        synchronized (gameLock) {
+
+            System.out.println(
+                    "[CAJERO] Tarjeta: "
+                            + uid
+            );
+
+            // AQUI: llamar el metodo que ya tienen para usar la tarjeta.
+            // Ejemplo: procesarTarjeta(uid);
+        }
+    }
+
+
+    // =========================================================
     // CERRAR SERVIDOR
     // =========================================================
 
@@ -768,6 +878,12 @@ public class GameServer {
                 && !serverSocket.isClosed()) {
 
             serverSocket.close();
+        }
+
+        if (servidorCajero != null
+                && !servidorCajero.isClosed()) {
+
+            servidorCajero.close();
         }
 
         pool.shutdownNow();
