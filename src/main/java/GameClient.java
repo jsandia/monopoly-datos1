@@ -25,9 +25,6 @@ public class GameClient {
     // EstadoJuego). Es la ventana del tablero.
     private Consumer<Message> oyente;
 
-    // Recibe confirmaciones del registro RFID.
-    private Consumer<Message.TarjetaRegistrada> oyenteTarjeta;
-
     // El último estado recibido, por si llega antes de que la ventana
     // esté lista para escucharlo.
     private Message.EstadoJuego ultimoEstado;
@@ -136,13 +133,6 @@ public class GameClient {
             Message mensaje
     ) {
 
-        if (mensaje instanceof Message.TarjetaRegistrada tarjeta) {
-            if (oyenteTarjeta != null) {
-                oyenteTarjeta.accept(tarjeta);
-            }
-            return;
-        }
-
         if (mensaje instanceof Message.EstadoJuego estado) {
             ultimoEstado = estado;
         }
@@ -162,17 +152,6 @@ public class GameClient {
         if (ultimoEstado != null) {
             oyente.accept(ultimoEstado);
         }
-    }
-
-
-    public synchronized void setOyenteTarjeta(
-            Consumer<Message.TarjetaRegistrada> oyenteTarjeta
-    ) {
-        this.oyenteTarjeta = oyenteTarjeta;
-    }
-
-    public void solicitarRegistroTarjeta(int indiceLocal) {
-        enviarAccion(new Message.SolicitarRegistroTarjeta(indiceLocal));
     }
 
 
