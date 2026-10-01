@@ -59,3 +59,12 @@ Pruebas: `CasasTest` verifica reglas y cobros, y `GameServerCasasTest` verifica
 el pago con RFID, el turno y la serialización del estado.
 
 Referencia de reglas: [manual clásico de Hasbro](https://www.hasbro.com/common/instruct/Monopoly.pdf).
+
+## Preview de hoteles
+
+Ejecuta el `main` de `src/test/java/cliente/PreviewHoteles.java` desde IntelliJ,
+con la raíz del proyecto como directorio de trabajo. Genera la imagen
+`docs/imagenes/preview-hoteles.png`, con hoteles en los cuatro lados del tablero.
+El código de demostración y la imagen pueden subirse a Git.
+
+![Preview de casas y hoteles](imagenes/preview-hoteles.png)
