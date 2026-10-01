@@ -53,7 +53,7 @@ public class VentanaTablero extends JFrame {
     private final JButton botonPagarMulta = new JButton("🔓 Pagar multa de la cárcel");
     private final JButton botonUsarCarta = new JButton("🃏 Usar carta \"Salga de la cárcel\"");
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
-    private final JButton botonComprarCasa = new JButton("Comprar casas");
+    private final JButton botonComprarCasa = new JButton("Comprar casas / hotel");
     private Message.EstadoJuego ultimoEstado;
     private final JButton botonPropiedades = new JButton("Propiedades de los jugadores");
     private VentanaPropiedades ventanaPropiedades;
@@ -224,7 +224,8 @@ public class VentanaTablero extends JFrame {
                         + "\nDueño: " + propietario + "\nRenta actual: ₡" + estado.renta()
                         + "\nCasas: " + estado.casas() + " | Hotel: " + (estado.hotel() ? "Sí" : "No")
                         + "\nHipotecada: " + (estado.hipotecada() ? "Sí" : "No")
-                        + (p.esEdificable() ? "\nPrecio por casa: ₡" + estado.precioCasa() : ""));
+                        + (p.esEdificable() ? "\nPrecio por casa: ₡" + estado.precioCasa()
+                        + "\nPrecio del hotel: ₡" + estado.precioHotel() : ""));
             }
         }
     }
@@ -442,7 +443,9 @@ public class VentanaTablero extends JFrame {
             }
         }
         JTextArea reglas = new JTextArea("Debes completar una vuelta desde la compra de la propiedad.\n"
-                + "Máximo 4 casas por propiedad. Casas disponibles: " + ultimoEstado.casasDisponibles());
+                + "Con 4 casas puedes comprar un hotel que las reemplaza.\n"
+                + "Casas disponibles: " + ultimoEstado.casasDisponibles()
+                + " | Hoteles disponibles: " + ultimoEstado.hotelesDisponibles());
         reglas.setEditable(false);
         reglas.setOpaque(false);
         JPanel panel = new JPanel(new BorderLayout(0, 10));
@@ -456,30 +459,35 @@ public class VentanaTablero extends JFrame {
         Runnable mostrarDisponibilidad = () -> {
             OpcionCasa elegida = (OpcionCasa) opciones.getSelectedItem();
             if (elegida != null) {
-                String motivo = elegida.estado().motivoNoComprarCasa();
-                disponibilidad.setText(motivo == null ? "Puedes comprar una casa en esta propiedad." : motivo);
+                String motivo = elegida.motivoNoComprar();
+                disponibilidad.setText(motivo == null ? "Puedes comprar " + (elegida.esHotel() ? "un hotel" : "una casa")
+                        + " en esta propiedad." : motivo);
             }
         };
         opciones.addActionListener(evento -> mostrarDisponibilidad.run());
         mostrarDisponibilidad.run();
         panel.add(disponibilidad, BorderLayout.SOUTH);
-        if (JOptionPane.showConfirmDialog(this, panel, "Comprar una casa", JOptionPane.OK_CANCEL_OPTION,
+        if (JOptionPane.showConfirmDialog(this, panel, "Comprar casas / hotel", JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
         OpcionCasa opcion = (OpcionCasa) opciones.getSelectedItem();
         if (opcion == null) return;
-        if (opcion.estado().motivoNoComprarCasa() != null) {
-            JOptionPane.showMessageDialog(this, opcion.estado().motivoNoComprarCasa(), "No se puede construir",
+        if (opcion.motivoNoComprar() != null) {
+            JOptionPane.showMessageDialog(this, opcion.motivoNoComprar(), "No se puede construir",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         botonComprarCasa.setEnabled(false);
-        enviar.accept(new Message.ComprarCasa(opcion.estado().id()));
+        enviar.accept(opcion.esHotel() ? new Message.ComprarHotel(opcion.estado().id())
+                : new Message.ComprarCasa(opcion.estado().id()));
     }
 
     private record OpcionCasa(Message.EstadoPropiedad estado, String nombre) {
+        boolean esHotel() { return estado.casas() == 4 && !estado.hotel(); }
+        String motivoNoComprar() { return esHotel() ? estado.motivoNoComprarHotel() : estado.motivoNoComprarCasa(); }
         @Override public String toString() {
-            return nombre + " — " + estado.casas() + " casas — ₡" + estado.precioCasa()
-                    + (estado.motivoNoComprarCasa() == null ? "" : " (no disponible)");
+            return nombre + " — " + (estado.hotel() ? "hotel construido" : estado.casas() + " casas")
+                    + " — " + (esHotel() ? "Hotel ₡" + estado.precioHotel() : "Casa ₡" + estado.precioCasa())
+                    + (motivoNoComprar() == null ? "" : " (no disponible)");
         }
     }
 

@@ -135,6 +135,51 @@ class CasasTest {
         assertEquals(32, banco.getCasasDisponibles());
     }
 
+    @Test void hotelReemplazaCuatroCasasDevuelveExistenciasYCobraRentaDeHotel() {
+        RegistroTransacciones registro = new RegistroTransacciones("HOTEL", carpeta);
+        banco.setRegistroTransacciones(registro);
+        assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
+        ana.mover(40, 40);
+        for (int i = 0; i < 4; i++) assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        int saldo = ana.getSaldo();
+        int saldoBanco = banco.getSaldo();
+        assertTrue(banco.comprarHotel(ana, propiedad(1)));
+        assertEquals(saldo - 50, ana.getSaldo());
+        assertEquals(saldoBanco + 50, banco.getSaldo());
+        assertTrue(propiedad(1).tieneHotel());
+        assertEquals(0, propiedad(1).getCantidadCasas());
+        assertEquals(32, banco.getCasasDisponibles());
+        assertEquals(11, banco.getHotelesDisponibles());
+        assertEquals(250, propiedad(1).calcularAlquiler());
+        assertFalse(banco.comprarCasa(ana, propiedad(1)));
+        assertFalse(banco.comprarHotel(ana, propiedad(1)));
+        int antesJose = jose.getSaldo();
+        assertTrue(banco.cobrarAlquiler(jose, propiedad(1)));
+        assertEquals(antesJose - 250, jose.getSaldo());
+        assertEquals(saldo - 50 + 250, ana.getSaldo());
+        assertEquals(1, registro.getHistorial().buscarPorTipo(TipoTransaccion.COMPRA_HOTEL).length);
+        assertEquals(50, registro.getHistorial().buscarPorTipo(TipoTransaccion.COMPRA_HOTEL)[0].monto());
+    }
+
+    @Test void hotelRechazaMenosDeCuatroCasasOtroDuenoSaldoInsuficienteYSinExistencias() {
+        assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
+        ana.mover(40, 40);
+        for (int i = 0; i < 3; i++) assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        assertFalse(banco.comprarHotel(ana, propiedad(1)));
+        assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        assertFalse(banco.comprarHotel(jose, propiedad(1)));
+        ana.setSaldo(49);
+        assertFalse(banco.comprarHotel(ana, propiedad(1)));
+        assertEquals(49, ana.getSaldo());
+        ana.setSaldo(500);
+        assertFalse(new Banco(1000, 32, 0).comprarHotel(ana, propiedad(1)));
+        assertEquals(500, ana.getSaldo());
+        assertEquals(4, propiedad(1).getCantidadCasas());
+        assertFalse(propiedad(1).tieneHotel());
+        assertEquals(28, banco.getCasasDisponibles());
+        assertEquals(12, banco.getHotelesDisponibles());
+    }
+
     @Test void noConstruyeEnServiciosNiTransportesYPreciosSonPorGrupo() {
         for (int id : new int[]{5, 12}) {
             assertTrue(banco.comprarPropiedad(ana, propiedad(id)));

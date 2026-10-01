@@ -17,6 +17,7 @@ public sealed interface Message extends Serializable
         Message.TirarDadosPrueba,
         Message.ComprarPropiedad,
         Message.ComprarCasa,
+        Message.ComprarHotel,
         Message.TerminarTurno,
         Message.PagarMultaCarcel,
         Message.UsarCartaCarcel,
@@ -108,9 +109,12 @@ public sealed interface Message extends Serializable
 
     record ComprarCasa(int idPropiedad) implements Message {}
 
+    record ComprarHotel(int idPropiedad) implements Message {}
+
     /** Datos oficiales de una propiedad; propietario es el índice del jugador o -1. */
     record EstadoPropiedad(int id, int propietario, int casas, boolean hotel,
-            boolean hipotecada, int renta, int precioCasa, String motivoNoComprarCasa) implements Serializable {}
+            boolean hipotecada, int renta, int precioCasa, String motivoNoComprarCasa,
+            int precioHotel, String motivoNoComprarHotel) implements Serializable {}
 
     record TerminarTurno() implements Message {}
 
@@ -166,6 +170,7 @@ public sealed interface Message extends Serializable
             boolean[] enCarcel,
             int[] cartasCarcel,
             EstadoPropiedad[] propiedades,
-            int casasDisponibles
+            int casasDisponibles,
+            int hotelesDisponibles
     ) implements Message {}
 }

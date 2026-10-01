@@ -128,4 +128,73 @@ class GameServerCasasTest {
         servidor.recibirTarjetaDelCajero("ABC0");
         assertEquals(1, propiedad(1).getCantidadCasas());
     }
+
+    private void cuatroCasas() {
+        ana.mover(40, 40);
+        for (int i = 0; i < 4; i++) assertTrue(juego.getBanco().comprarCasa(ana, propiedad(1)));
+    }
+
+    private void pedirHotel(int computadora, int id) throws Exception {
+        invocar("comprarHotel", new Class<?>[]{int.class, ObjectOutputStream.class, int.class}, computadora, salida, id);
+    }
+
+    @Test void hotelSoloSePagaConTarjetaCorrectaYSeSincronizaNuevaRenta() throws Exception {
+        cuatroCasas();
+        int saldo = ana.getSaldo();
+        pedirHotel(0, 1);
+        assertEquals(saldo, ana.getSaldo());
+        assertFalse(propiedad(1).tieneHotel());
+        servidor.recibirTarjetaDelCajero("ABC1");
+        assertFalse(propiedad(1).tieneHotel());
+        servidor.recibirTarjetaDelCajero("ABC0");
+        assertEquals(saldo - 50, ana.getSaldo());
+        assertTrue(propiedad(1).tieneHotel());
+        servidor.recibirTarjetaDelCajero("ABC0");
+        assertEquals(saldo - 50, ana.getSaldo());
+        Message.EstadoJuego estado = (Message.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
+        assertTrue(estado.propiedades()[1].hotel());
+        assertEquals(0, estado.propiedades()[1].casas());
+        assertEquals(250, estado.propiedades()[1].renta());
+        assertEquals(50, estado.propiedades()[1].precioHotel());
+        assertNotNull(estado.propiedades()[1].motivoNoComprarHotel());
+        assertEquals(32, estado.casasDisponibles());
+        assertEquals(11, estado.hotelesDisponibles());
+        ByteArrayOutputStream copia = new ByteArrayOutputStream();
+        try (ObjectOutputStream out = new ObjectOutputStream(copia)) { out.writeObject(estado); }
+        try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(copia.toByteArray()))) {
+            Message.EstadoJuego recibido = (Message.EstadoJuego) in.readObject();
+            assertTrue(recibido.propiedades()[1].hotel());
+            assertEquals(250, recibido.propiedades()[1].renta());
+        }
+    }
+
+    @Test void hotelValidaTurnoCasasYComprasPendientesYRevisaSaldoAlPagar() throws Exception {
+        pedirHotel(0, 1);
+        assertNull(campo("jugadorPendientePago"));
+        cuatroCasas();
+        pedirHotel(1, 1);
+        assertNull(campo("jugadorPendientePago"));
+        pedirHotel(0, -1);
+        assertNull(campo("jugadorPendientePago"));
+        pedirHotel(0, 1);
+        pedirCasa(0, 3);
+        assertSame(propiedad(1), campo("propiedadPendientePago"));
+        ana.setSaldo(49);
+        servidor.recibirTarjetaDelCajero("ABC0");
+        assertFalse(propiedad(1).tieneHotel());
+        assertEquals(4, propiedad(1).getCantidadCasas());
+        assertEquals(49, ana.getSaldo());
+        assertNull(campo("jugadorPendientePago"));
+    }
+
+    @Test void hotelPendienteSeCancelaCuandoSeTerminaElTurno() throws Exception {
+        cuatroCasas();
+        asignar("yaTiro", true);
+        pedirHotel(0, 1);
+        invocar("terminarTurno", new Class<?>[]{int.class, ObjectOutputStream.class}, 0, salida);
+        servidor.recibirTarjetaDelCajero("ABC0");
+        assertFalse(propiedad(1).tieneHotel());
+        assertEquals(4, propiedad(1).getCantidadCasas());
+        assertNull(campo("jugadorPendientePago"));
+    }
 }

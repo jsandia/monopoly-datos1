@@ -12,7 +12,7 @@ class VentanaPropiedadesTest {
     private static Message.EstadoJuego estado(Message.EstadoPropiedad[] propiedades) {
         return new Message.EstadoJuego(1, 100, 0, new String[]{"Ana", "José", "Luis", "María"},
                 new int[]{1500, 1500, 1500, 1500}, new int[4], new int[]{0, 0, 1, 1},
-                false, false, false, new boolean[4], new int[4], propiedades, 32);
+                false, false, false, new boolean[4], new int[4], propiedades, 32, 12);
     }
 
     private static <T extends Component> T buscar(Component componente, Class<T> tipo) {
@@ -31,8 +31,8 @@ class VentanaPropiedadesTest {
             VentanaPropiedades ventana = new VentanaPropiedades(null, new Tablero());
             try {
                 Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[40];
-                propiedades[1] = new Message.EstadoPropiedad(1, 0, 2, false, false, 30, 50, null);
-                propiedades[3] = new Message.EstadoPropiedad(3, 1, 0, false, true, 0, 50, null);
+                propiedades[1] = new Message.EstadoPropiedad(1, 0, 2, false, false, 30, 50, null, 50, "Necesita cuatro casas.");
+                propiedades[3] = new Message.EstadoPropiedad(3, 1, 0, false, true, 0, 50, null, 50, "Propiedad hipotecada.");
                 ventana.actualizar(estado(propiedades));
                 JTabbedPane pestanas = buscar(ventana.getContentPane(), JTabbedPane.class);
                 assertEquals(4, pestanas.getTabCount());
@@ -59,7 +59,7 @@ class VentanaPropiedadesTest {
                 ventana.actualizar(estado(propiedades));
                 JTabbedPane pestanas = buscar(ventana.getContentPane(), JTabbedPane.class);
                 pestanas.setSelectedIndex(1);
-                propiedades[3] = new Message.EstadoPropiedad(3, 1, 3, false, false, 180, 50, null);
+                propiedades[3] = new Message.EstadoPropiedad(3, 1, 3, false, false, 180, 50, null, 50, "Necesita cuatro casas.");
                 ventana.actualizar(estado(propiedades));
                 assertEquals(1, pestanas.getSelectedIndex());
                 assertEquals("José (1)", pestanas.getTitleAt(1));
@@ -67,6 +67,13 @@ class VentanaPropiedadesTest {
                 assertEquals("Cahuita", tabla.getValueAt(0, 0));
                 assertEquals(3, tabla.getValueAt(0, 2));
                 assertEquals("₡180", tabla.getValueAt(0, 4));
+                propiedades[3] = new Message.EstadoPropiedad(3, 1, 0, true, false, 450, 50,
+                        "Ya tiene hotel.", 50, "Ya tiene hotel.");
+                ventana.actualizar(estado(propiedades));
+                tabla = buscar(pestanas.getComponentAt(1), JTable.class);
+                assertEquals(0, tabla.getValueAt(0, 2));
+                assertEquals("Sí", tabla.getValueAt(0, 3));
+                assertEquals("₡450", tabla.getValueAt(0, 4));
             } finally { ventana.dispose(); }
         });
     }

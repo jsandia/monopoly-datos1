@@ -1,6 +1,6 @@
-# Compra de casas
+# Compra de casas y hoteles
 
-La ventana abierta desde `Interfaz.java` muestra el botón **Comprar casas**
+La ventana abierta desde `Interfaz.java` muestra el botón **Comprar casas / hotel**
 cuando el jugador en turno posee una propiedad edificable. Puede elegir cualquiera
 de sus propiedades, sin tener que caer en ella, antes o después de tirar los dados.
 
@@ -16,6 +16,13 @@ No se exige completar el grupo de color ni repartir las casas uniformemente.
 Las casas se compran de una en una, hasta cuatro por propiedad. Solo la propiedad
 donde se construye debe estar libre de hipoteca. No se construye en transportes ni servicios.
 El banco dispone inicialmente de 32 casas y comprueba saldo y existencias.
+
+Cuando una propiedad tiene cuatro casas, el selector ofrece comprar un hotel.
+Se paga el precio de hotel (igual al de una casa del grupo), se retiran las cuatro
+casas y se devuelven al banco. La propiedad queda con un hotel rojo y cobra la renta
+de hotel de su escritura; Sixaola, por ejemplo, cobra ₡250. El banco tiene inicialmente
+12 hoteles. Solo se permite un hotel por propiedad. Se mantienen las reglas acordadas:
+no hace falta completar el grupo de color ni tener cuatro casas en otras propiedades.
 
 Cada compra se confirma al acercar la tarjeta RFID del jugador en turno, igual
 que la compra de propiedades. Una tarjeta incorrecta no realiza el cobro. Si se
@@ -33,10 +40,10 @@ cantidad de casas. Por ejemplo, Sixaola cobra ₡2 de base, ₡4 con el grupo co
 sin casas y ₡10, ₡30, ₡90 o ₡160 con una, dos, tres o cuatro casas. La propiedad
 hipotecada cobra cero. Cada compra y cada pago de renta se registra en el historial.
 
-El cliente envía `Message.ComprarCasa(idPropiedad)`. El servidor valida el turno
+El cliente envía `Message.ComprarCasa(idPropiedad)` o `Message.ComprarHotel(idPropiedad)`. El servidor valida el turno
 y las reglas antes de solicitar el pago y vuelve a validarlas al leer la tarjeta.
 `EstadoJuego` incluye las propiedades con dueño, casas, hotel, hipoteca, renta,
-precio por casa y motivo que impide construir, además de las existencias del banco.
+precios de casa y hotel y motivos que impiden construir, además de las existencias del banco.
 Ambas computadoras dibujan las casas verdes sobre la franja de color y muestran
 la renta oficial. El cliente no cambia las propiedades del modelo por su cuenta.
 
@@ -46,8 +53,7 @@ cuando alguien todavía no tiene propiedades. Se actualiza con cada estado del
 servidor y se puede consultar incluso fuera del turno o al finalizar la partida.
 
 Se debe recompilar y reiniciar el servidor y ambos clientes porque cambió el
-mensaje de estado compartido. Esta opción compra casas; la compra de hoteles
-todavía no se ofrece en la ventana.
+mensaje de estado compartido.
 
 Pruebas: `CasasTest` verifica reglas y cobros, y `GameServerCasasTest` verifica
 el pago con RFID, el turno y la serialización del estado.

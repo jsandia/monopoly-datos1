@@ -95,7 +95,8 @@ public class GameServer {
     private Jugador jugadorPendientePago;
     private Propiedad propiedadPendientePago;
     private int computadoraPendientePago = -1;
-    private boolean pagoPendienteCasa;
+    private enum TipoCompra { PROPIEDAD, CASA, HOTEL }
+    private TipoCompra tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
 
     // =========================================================
@@ -282,6 +283,10 @@ public class GameServer {
 
                 else if (mensaje instanceof Message.ComprarCasa compra) {
                     comprarCasa(playerId, out, compra.idPropiedad());
+                }
+
+                else if (mensaje instanceof Message.ComprarHotel compra) {
+                    comprarHotel(playerId, out, compra.idPropiedad());
                 }
 
                 else if (mensaje instanceof Message.TerminarTurno) {
@@ -1130,7 +1135,7 @@ public class GameServer {
             jugadorPendientePago = actual;
             propiedadPendientePago = propiedad;
             computadoraPendientePago = computadora;
-            pagoPendienteCasa = false;
+            tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
             escribir(out, new Message.Aviso(
                     actual.getNombre()
@@ -1142,6 +1147,14 @@ public class GameServer {
     }
 
     private void comprarCasa(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
+        comprarConstruccion(computadora, out, idPropiedad, false);
+    }
+
+    private void comprarHotel(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
+        comprarConstruccion(computadora, out, idPropiedad, true);
+    }
+
+    private void comprarConstruccion(int computadora, ObjectOutputStream out, int idPropiedad, boolean hotel) throws IOException {
         synchronized (gameLock) {
             String error = validarTurno(computadora);
             if (error == null && jugadorPendientePago != null) error = "Ya hay una compra esperando el pago con tarjeta.";
@@ -1152,7 +1165,8 @@ public class GameServer {
                     error = "Selecciona una propiedad válida.";
                 } else {
                     propiedad = (Propiedad) tablero.obtenerCasilla(idPropiedad);
-                    error = juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), propiedad);
+                    error = hotel ? juego.getBanco().motivoNoComprarHotel(juego.getJugadorActual(), propiedad)
+                            : juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), propiedad);
                 }
             }
             if (error == null && !juego.getJugadorActual().tieneTarjetaRegistrada()) error = "El jugador no tiene tarjeta RFID registrada.";
@@ -1164,10 +1178,10 @@ public class GameServer {
             jugadorPendientePago = juego.getJugadorActual();
             propiedadPendientePago = propiedad;
             computadoraPendientePago = computadora;
-            pagoPendienteCasa = true;
+            tipoCompraPendiente = hotel ? TipoCompra.HOTEL : TipoCompra.CASA;
             escribir(out, new Message.Aviso(jugadorPendientePago.getNombre()
-                    + ", acerque su tarjeta RFID para pagar ₡" + propiedad.getPrecioCasa()
-                    + " y comprar una casa en " + propiedad.getNombre() + "."));
+                    + ", acerque su tarjeta RFID para pagar ₡" + (hotel ? propiedad.getPrecioHotel() : propiedad.getPrecioCasa())
+                    + " y comprar " + (hotel ? "un hotel" : "una casa") + " en " + propiedad.getNombre() + "."));
         }
     }
 
@@ -1240,7 +1254,7 @@ public class GameServer {
             jugadorPendientePago = null;
             propiedadPendientePago = null;
             computadoraPendientePago = -1;
-            pagoPendienteCasa = false;
+            tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
             yaTiro = false;
 
@@ -1385,7 +1399,8 @@ public class GameServer {
                 }
                 propiedades[i] = new Message.EstadoPropiedad(i, propietario, p.getCantidadCasas(),
                         p.tieneHotel(), p.estaHipotecada(), p.calcularAlquiler(), p.getPrecioCasa(),
-                        juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), p));
+                        juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), p), p.getPrecioHotel(),
+                        juego.getBanco().motivoNoComprarHotel(juego.getJugadorActual(), p));
             }
         }
 
@@ -1403,7 +1418,8 @@ public class GameServer {
                 enCarcel,
                 cartasCarcel,
                 propiedades,
-                juego.getBanco().getCasasDisponibles()
+                juego.getBanco().getCasasDisponibles(),
+                juego.getBanco().getHotelesDisponibles()
         );
     }
 
@@ -1527,16 +1543,19 @@ public class GameServer {
                 Jugador jugador = jugadorPendientePago;
                 Propiedad propiedad = propiedadPendientePago;
                 int computadora = computadoraPendientePago;
-                boolean compraCasa = pagoPendienteCasa;
+                TipoCompra compra = tipoCompraPendiente;
 
                 jugadorPendientePago = null;
                 propiedadPendientePago = null;
                 computadoraPendientePago = -1;
-                pagoPendienteCasa = false;
+                tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
                 if (juego.esFinDeJuego() || juego.getJugadorActual() != jugador
-                        || !(compraCasa ? juego.getBanco().comprarCasa(jugador, propiedad)
-                        : juego.getBanco().comprarPropiedadConTarjeta(jugador, propiedad, uid))) {
+                        || !switch (compra) {
+                            case CASA -> juego.getBanco().comprarCasa(jugador, propiedad);
+                            case HOTEL -> juego.getBanco().comprarHotel(jugador, propiedad);
+                            case PROPIEDAD -> juego.getBanco().comprarPropiedadConTarjeta(jugador, propiedad, uid);
+                        }) {
                     avisarComputadora(computadora, "No se pudo realizar el pago.");
                     difundir(crearEstado());
                     return;
@@ -1544,7 +1563,11 @@ public class GameServer {
 
                 difundir(new Message.Aviso(
                         "¡" + jugador.getNombre() + " pagó con su tarjeta y compró "
-                                + (compraCasa ? "una casa en " : "") + propiedad.getNombre() + "!"
+                                + switch (compra) {
+                                    case CASA -> "una casa en ";
+                                    case HOTEL -> "un hotel en ";
+                                    case PROPIEDAD -> "";
+                                } + propiedad.getNombre() + "!"
                 ));
                 difundir(crearEstado());
                 return;

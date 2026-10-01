@@ -558,39 +558,7 @@ public class Banco {
     ) {
         int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
 
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // Debe ser dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // No se puede construir sobre una propiedad hipotecada.
-        if (propiedad.estaHipotecada()) {
-            return false;
-        }
-
-        // Ya tiene hotel.
-        if (propiedad.tieneHotel()) {
-            return false;
-        }
-
-        // Necesita exactamente 4 casas.
-        if (propiedad.getCantidadCasas() != 4) {
-            return false;
-        }
-
-        // Debe haber hoteles disponibles.
-        if (hotelesDisponibles <= 0) {
-            return false;
-        }
+        if (motivoNoComprarHotel(jugador, propiedad) != null) return false;
 
         int precio =
                 propiedad.getPrecioHotel();
@@ -632,6 +600,23 @@ public class Banco {
         return true;
     }
 
+
+    // =========================================================
+    // DISPONIBILIDAD DE HOTELES
+    // =========================================================
+
+    /** null si se puede comprar; valida dueño, cuatro casas, saldo y existencias. */
+    public synchronized String motivoNoComprarHotel(Jugador jugador, Propiedad propiedad) {
+        if (propiedad == null) return "Selecciona una propiedad válida.";
+        if (jugador == null || propiedad.getPropietario() != jugador) return "La propiedad no pertenece al jugador en turno.";
+        if (!propiedad.esEdificable()) return "No se construyen hoteles en transportes ni servicios.";
+        if (propiedad.estaHipotecada()) return "La propiedad está hipotecada.";
+        if (propiedad.tieneHotel()) return "La propiedad ya tiene un hotel.";
+        if (propiedad.getCantidadCasas() != 4) return "Necesitas cuatro casas en esta propiedad para comprar un hotel.";
+        if (hotelesDisponibles <= 0) return "El banco no tiene hoteles disponibles.";
+        if (jugador.getSaldo() < propiedad.getPrecioHotel()) return "Saldo insuficiente para comprar un hotel.";
+        return null;
+    }
 
     // =========================================================
     // VENDER HOTEL

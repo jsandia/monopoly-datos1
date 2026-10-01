@@ -379,7 +379,7 @@ public class PanelTablero extends JPanel {
         }
     }
 
-    /** Casas verdes sobre la franja de color, orientadas hacia el centro del tablero. */
+    /** Casas verdes y hoteles rojos sobre la franja de color, mirando hacia el centro. */
     private void dibujarConstrucciones(Graphics2D g2, Propiedad propiedad, Rectangle r, Lado lado, int grosor) {
         Message.EstadoPropiedad estado = propiedades[propiedad.getId()];
         int casas = estado == null ? propiedad.getCantidadCasas() : estado.casas();
@@ -413,7 +413,14 @@ public class PanelTablero extends JPanel {
                 dibujo.setColor(new Color(0x163A22));
                 dibujo.draw(silueta);
                 dibujo.setColor(Color.WHITE);
-                dibujo.fillRect(x + ancho / 2 - 1, y + tamano * 2 / 3, 2, Math.max(2, tamano / 3));
+                if (hotel) {
+                    dibujo.setFont(new Font("SansSerif", Font.BOLD, Math.max(6, tamano * 2 / 3)));
+                    FontMetrics letras = dibujo.getFontMetrics();
+                    dibujo.drawString("H", x + (ancho - letras.stringWidth("H")) / 2,
+                            y + tamano - 1);
+                } else {
+                    dibujo.fillRect(x + ancho / 2 - 1, y + tamano * 2 / 3, 2, Math.max(2, tamano / 3));
+                }
             }
         } finally {
             dibujo.dispose();
