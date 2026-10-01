@@ -12,6 +12,8 @@ public class Propiedad extends Casilla {
     private final int alquiler;
     private final int[] alquileresConstrucciones;
     private Tablero tablero;
+    private long recorridoDesdeCompra;
+    private boolean vueltaDesdeCompraCompletada;
 
     // Atributos para gestion del Banco y Jugadores
     private Jugador propietario;
@@ -69,7 +71,19 @@ public class Propiedad extends Casilla {
     }
 
     public void setPropietario(Jugador propietario) {
+        if (this.propietario != propietario) {
+            recorridoDesdeCompra = 0;
+            vueltaDesdeCompraCompletada = false;
+        }
         this.propietario = propietario;
+    }
+
+    /** Cuenta el recorrido desde la compra. Una vuelta cumplida permanece habilitada. */
+    void registrarMovimiento(int pasos) {
+        if (propietario == null || vueltaDesdeCompraCompletada) return;
+        recorridoDesdeCompra += pasos;
+        int longitudVuelta = tablero == null ? 40 : tablero.tamaño();
+        if (recorridoDesdeCompra >= longitudVuelta) vueltaDesdeCompraCompletada = true;
     }
 
     public boolean tienePropietario() {
@@ -124,14 +138,10 @@ public class Propiedad extends Casilla {
         if (!esEdificable()) return "No se construyen casas en transportes ni servicios.";
         if (hipotecada) return "La propiedad está hipotecada.";
         if (tieneHotel || casas >= 4) return "La propiedad ya tiene el máximo de casas o un hotel.";
-        if (tablero != null) {
-            if (!tablero.tieneGrupoCompleto(jugador, grupo)) return "Debes comprar todas las propiedades del grupo " + grupo + ".";
-            for (int i = 0; i < tablero.tamaño(); i++) {
-                if (tablero.obtenerCasilla(i) instanceof Propiedad otra && otra.grupo.equals(grupo)) {
-                    if (otra.hipotecada) return "No puede haber propiedades hipotecadas en el grupo.";
-                    if (!otra.tieneHotel && otra.casas < casas) return "Construye uniformemente: primero agrega una casa a " + otra.getNombre() + ".";
-                }
-            }
+        if (!vueltaDesdeCompraCompletada) {
+            int longitudVuelta = tablero == null ? 40 : tablero.tamaño();
+            return "Debes completar una vuelta desde la compra de " + getNombre()
+                    + ". Te faltan " + (longitudVuelta - recorridoDesdeCompra) + " casillas de recorrido.";
         }
         return null;
     }

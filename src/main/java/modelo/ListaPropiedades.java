@@ -69,6 +69,19 @@ public class ListaPropiedades {
         return false;
     }
 
+    /**
+     * Recorre los nodos y registra el movimiento en las propiedades del dueño.
+     * Cada propiedad conserva su propio progreso desde que fue adquirida.
+     */
+    public void registrarMovimiento(Jugador jugador, int pasos) {
+        NodoPropiedad actual = cabeza;
+        while (actual != null) {
+            Propiedad propiedad = actual.getPropiedad();
+            if (propiedad.getPropietario() == jugador) propiedad.registrarMovimiento(pasos);
+            actual = actual.getSiguiente();
+        }
+    }
+
     // Suma el precio de compra de todas las propiedades guardadas
     public int obtenerValorTotal() {
         int total = 0;

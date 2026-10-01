@@ -17,21 +17,85 @@ class CasasTest {
     private void comprarGrupoCafe() {
         assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
         assertTrue(banco.comprarPropiedad(ana, propiedad(3)));
+        ana.mover(40, tablero.tamaño());
     }
 
-    @Test void exigeGrupoCompletoYConstruccionUniforme() {
+    @Test void construyeEnUnaSolaPropiedadTrasUnaVueltaSinExigirGrupoNiUniformidad() {
+        ana.setPosicionActual(34);
         assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
         int saldo = ana.getSaldo();
         assertFalse(banco.comprarCasa(ana, propiedad(1)));
+        ana.mover(39, tablero.tamaño()); // Ya pasó por Salida, pero falta una casilla de recorrido.
+        assertFalse(banco.comprarCasa(ana, propiedad(1)));
         assertEquals(saldo, ana.getSaldo());
         assertEquals(32, banco.getCasasDisponibles());
-        assertTrue(banco.comprarPropiedad(ana, propiedad(3)));
+        ana.mover(1, tablero.tamaño());
         assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        for (int i = 0; i < 3; i++) assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        assertEquals(4, propiedad(1).getCantidadCasas());
+        assertEquals(0, propiedad(3).getCantidadCasas());
+        assertNull(propiedad(3).getPropietario());
+        assertEquals(28, banco.getCasasDisponibles());
         assertFalse(banco.comprarCasa(ana, propiedad(1)));
-        assertTrue(banco.comprarCasa(ana, propiedad(3)));
+    }
+
+    @Test void cadaCompraTieneSuPropiaVueltaYNoCuentaRecorridoAnterior() {
+        ana.mover(80, tablero.tamaño());
+        assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
+        assertFalse(banco.comprarCasa(ana, propiedad(1)));
+        ana.mover(20, tablero.tamaño());
+        assertTrue(banco.comprarPropiedad(ana, propiedad(3)));
+        ana.mover(20, tablero.tamaño());
         assertTrue(banco.comprarCasa(ana, propiedad(1)));
-        assertEquals(2, propiedad(1).getCantidadCasas());
-        assertEquals(29, banco.getCasasDisponibles());
+        assertFalse(banco.comprarCasa(ana, propiedad(3)));
+        ana.mover(20, tablero.tamaño());
+        assertTrue(banco.comprarCasa(ana, propiedad(3)));
+    }
+
+    @Test void retrocederDescuentaRecorridoYCarcelNoCompletaVuelta() {
+        assertTrue(banco.comprarPropiedad(ana, propiedad(1)));
+        ana.mover(38, tablero.tamaño());
+        ana.mover(-3, tablero.tamaño());
+        ana.enviarACarcel(10);
+        ana.setPosicionActual(39);
+        ana.mover(1, tablero.tamaño());
+        assertFalse(banco.comprarCasa(ana, propiedad(1)));
+        ana.mover(4, tablero.tamaño());
+        assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        ana.mover(-3, tablero.tamaño());
+        assertTrue(banco.comprarCasa(ana, propiedad(1))); // Una vuelta cumplida sigue habilitada.
+    }
+
+    @Test void hipotecaDeOtraPropiedadNoImpideConstruirYCambioDeDuenoReiniciaEspera() {
+        comprarGrupoCafe();
+        assertTrue(propiedad(3).hipotecar());
+        assertTrue(banco.comprarCasa(ana, propiedad(1)));
+        propiedad(1).setPropietario(jose);
+        jose.agregarPropiedad(propiedad(1));
+        ana.mover(40, tablero.tamaño());
+        assertFalse(banco.comprarCasa(jose, propiedad(1)));
+        jose.mover(40, tablero.tamaño());
+        assertTrue(banco.comprarCasa(jose, propiedad(1)));
+    }
+
+    @Test void cartaDeRetrocesoDescuentaRecorridoEnElMotorDelJuego() throws Exception {
+        Juego juego = new Juego(20, 2, "TEST_RECORRIDO", false);
+        try {
+            juego.agregarJugador(ana);
+            juego.agregarJugador(jose);
+            Propiedad sixaola = (Propiedad) juego.getTablero().obtenerCasilla(1);
+            assertTrue(juego.getBanco().comprarPropiedad(ana, sixaola));
+            ana.mover(30, 40);
+            ana.setPosicionActual(4);
+            while (juego.getMazoSuerte().verFrente().getId() != 17) {
+                juego.getMazoSuerte().encolar(juego.getMazoSuerte().desencolar());
+            }
+            juego.jugarTiro(1, 2); // Avanza a Suerte y retrocede tres: recorrido neto sigue en 30.
+            ana.mover(9, 40);
+            assertFalse(juego.getBanco().comprarCasa(ana, sixaola));
+            ana.mover(1, 40);
+            assertTrue(juego.getBanco().comprarCasa(ana, sixaola));
+        } finally { java.nio.file.Files.deleteIfExists(juego.getArchivoTransacciones()); }
     }
 
     @Test void rentasClasicasCobroYRegistroHastaCuatroCasas() {
@@ -58,10 +122,10 @@ class CasasTest {
     @Test void rechazaAjenaHipotecaSaldoInsuficienteYSinExistencias() {
         comprarGrupoCafe();
         assertFalse(banco.comprarCasa(jose, propiedad(1)));
-        assertTrue(propiedad(3).hipotecar());
+        assertTrue(propiedad(1).hipotecar());
         assertFalse(banco.comprarCasa(ana, propiedad(1)));
-        assertEquals(0, propiedad(3).calcularAlquiler());
-        assertTrue(propiedad(3).quitarHipoteca());
+        assertEquals(0, propiedad(1).calcularAlquiler());
+        assertTrue(propiedad(1).quitarHipoteca());
         ana.setSaldo(49);
         assertFalse(banco.comprarCasa(ana, propiedad(1)));
         assertEquals(49, ana.getSaldo());

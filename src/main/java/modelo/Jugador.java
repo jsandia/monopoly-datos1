@@ -81,7 +81,12 @@ public class Jugador {
 
     // Actualiza la posicion dentro del tablero
     public void mover(int casillasAvanzar, int totalCasillasTablero) {
-        this.posicionActual = (this.posicionActual + casillasAvanzar) % totalCasillasTablero;
+        this.posicionActual = Math.floorMod(this.posicionActual + casillasAvanzar, totalCasillasTablero);
+        registrarMovimiento(casillasAvanzar);
+    }
+
+    void registrarMovimiento(int pasos) {
+        propiedades.registrarMovimiento(this, pasos);
     }
 
     // =========================================================

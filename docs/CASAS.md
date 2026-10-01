@@ -4,10 +4,17 @@ La ventana abierta desde `Interfaz.java` muestra el botón **Comprar casas**
 cuando el jugador en turno posee una propiedad edificable. Puede elegir cualquiera
 de sus propiedades, sin tener que caer en ella, antes o después de tirar los dados.
 
-Para construir debe poseer todo el grupo de color. Las casas se compran de una
-en una y uniformemente: no se permite una segunda casa hasta que cada propiedad
-del grupo tenga una. El máximo es cuatro casas por propiedad. Ninguna propiedad
-del grupo puede estar hipotecada. No se construye en transportes ni servicios.
+Para construir debe ser dueño de la propiedad y haber recorrido una vuelta
+completa (40 casillas) desde su compra. Cada propiedad tiene su propio contador:
+los recorridos anteriores a la compra no cuentan y pasar por Salida no basta
+si aún no ha recorrido las 40 casillas desde que la adquirió. Los movimientos
+de cartas hacia adelante cuentan; los retrocesos descuentan recorrido. Ir directo
+a la cárcel no cuenta. Una vez cumplida la vuelta, la propiedad sigue habilitada.
+Cambiar el dueño reinicia la espera para el nuevo propietario.
+
+No se exige completar el grupo de color ni repartir las casas uniformemente.
+Las casas se compran de una en una, hasta cuatro por propiedad. Solo la propiedad
+donde se construye debe estar libre de hipoteca. No se construye en transportes ni servicios.
 El banco dispone inicialmente de 32 casas y comprueba saldo y existencias.
 
 Cada compra se confirma al acercar la tarjeta RFID del jugador en turno, igual
@@ -32,6 +39,11 @@ y las reglas antes de solicitar el pago y vuelve a validarlas al leer la tarjeta
 precio por casa y motivo que impide construir, además de las existencias del banco.
 Ambas computadoras dibujan las casas verdes sobre la franja de color y muestran
 la renta oficial. El cliente no cambia las propiedades del modelo por su cuenta.
+
+El botón **Propiedades de los jugadores** abre una ventana con una pestaña por
+jugador. Muestra sus propiedades, grupo, casas, hotel, renta e hipoteca, e indica
+cuando alguien todavía no tiene propiedades. Se actualiza con cada estado del
+servidor y se puede consultar incluso fuera del turno o al finalizar la partida.
 
 Se debe recompilar y reiniciar el servidor y ambos clientes porque cambió el
 mensaje de estado compartido. Esta opción compra casas; la compra de hoteles

@@ -363,6 +363,7 @@ public class Juego {
                     nodo = nodo.getAnterior();
                 }
                 jugador.setPosicionActual(nodo.getDato().getId());
+                jugador.registrarMovimiento(-valor);
                 log.append("\n").append(jugador.getNombre()).append(" retrocede a ")
                         .append(nodo.getDato().getNombre()).append(".");
                 resolverCasilla(jugador, log);

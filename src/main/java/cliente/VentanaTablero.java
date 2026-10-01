@@ -55,6 +55,8 @@ public class VentanaTablero extends JFrame {
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
     private final JButton botonComprarCasa = new JButton("Comprar casas");
     private Message.EstadoJuego ultimoEstado;
+    private final JButton botonPropiedades = new JButton("Propiedades de los jugadores");
+    private VentanaPropiedades ventanaPropiedades;
     private Casilla casillaSeleccionada;
     private VentanaHistorial ventanaHistorial;
     private String[] nombresJugadores = new String[0];
@@ -173,6 +175,8 @@ public class VentanaTablero extends JFrame {
         botonTerminarTurno.setEnabled(false);
         botonHistorial.setEnabled(false);
         botonHistorial.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonPropiedades.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonPropiedades.setEnabled(false);
 
         etiquetaIndicacion.setFont(new Font("SansSerif", Font.BOLD, 13));
         etiquetaIndicacion.setForeground(new Color(0xC0392B));
@@ -191,6 +195,8 @@ public class VentanaTablero extends JFrame {
         panelBotones.add(botonUsarCarta);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonHistorial);
+        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
+        panelBotones.add(botonPropiedades);
 
         panel.add(etiquetaTurnoJugador, 0);
         panel.add(etiquetaSaldoJugador, 1);
@@ -298,6 +304,10 @@ public class VentanaTablero extends JFrame {
     /** Pone la ventana igual a lo que dice el servidor. */
     private void aplicarEstado(Message.EstadoJuego estado) {
         ultimoEstado = estado;
+        botonPropiedades.setEnabled(true);
+        if (ventanaPropiedades != null && ventanaPropiedades.isDisplayable()) {
+            ventanaPropiedades.actualizar(estado);
+        }
         panelTablero.actualizarPropiedades(estado.propiedades());
         if (casillaSeleccionada != null) mostrarCasilla(casillaSeleccionada);
         nombresJugadores = estado.nombres().clone();
@@ -376,6 +386,14 @@ public class VentanaTablero extends JFrame {
     }
 
     private void configurarEventosBotones() {
+        botonPropiedades.addActionListener(evento -> {
+            if (ultimoEstado == null) return;
+            if (ventanaPropiedades == null || !ventanaPropiedades.isDisplayable()) {
+                ventanaPropiedades = new VentanaPropiedades(this, modeloTablero);
+            }
+            ventanaPropiedades.actualizar(ultimoEstado);
+            ventanaPropiedades.setVisible(true);
+        });
         botonComprarCasa.addActionListener(evento -> elegirPropiedadParaCasa());
         botonHistorial.addActionListener(evento -> {
             if (ventanaHistorial == null || !ventanaHistorial.isDisplayable()) {
@@ -423,13 +441,28 @@ public class VentanaTablero extends JFrame {
                 opciones.addItem(new OpcionCasa(p, modeloTablero.obtenerCasilla(p.id()).getNombre()));
             }
         }
-        JTextArea reglas = new JTextArea("Debes tener todo el grupo de color y construir uniformemente.\n"
+        JTextArea reglas = new JTextArea("Debes completar una vuelta desde la compra de la propiedad.\n"
                 + "Máximo 4 casas por propiedad. Casas disponibles: " + ultimoEstado.casasDisponibles());
         reglas.setEditable(false);
         reglas.setOpaque(false);
         JPanel panel = new JPanel(new BorderLayout(0, 10));
         panel.add(reglas, BorderLayout.NORTH);
         panel.add(opciones, BorderLayout.CENTER);
+        JTextArea disponibilidad = new JTextArea(3, 42);
+        disponibilidad.setEditable(false);
+        disponibilidad.setLineWrap(true);
+        disponibilidad.setWrapStyleWord(true);
+        disponibilidad.setOpaque(false);
+        Runnable mostrarDisponibilidad = () -> {
+            OpcionCasa elegida = (OpcionCasa) opciones.getSelectedItem();
+            if (elegida != null) {
+                String motivo = elegida.estado().motivoNoComprarCasa();
+                disponibilidad.setText(motivo == null ? "Puedes comprar una casa en esta propiedad." : motivo);
+            }
+        };
+        opciones.addActionListener(evento -> mostrarDisponibilidad.run());
+        mostrarDisponibilidad.run();
+        panel.add(disponibilidad, BorderLayout.SOUTH);
         if (JOptionPane.showConfirmDialog(this, panel, "Comprar una casa", JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
         OpcionCasa opcion = (OpcionCasa) opciones.getSelectedItem();

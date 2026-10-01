@@ -63,6 +63,7 @@ class GameServerCasasTest {
     }
 
     @Test void compraAntesDeTirarSoloAlLeerTarjetaCorrectaYSincronizaEstado() throws Exception {
+        ana.mover(40, 40);
         int antes = ana.getSaldo();
         pedirCasa(0, 1);
         assertEquals(antes, ana.getSaldo());
@@ -87,6 +88,7 @@ class GameServerCasasTest {
     }
 
     @Test void rechazaOtraComputadoraCasillaInvalidaYCompraPendienteDuplicada() throws Exception {
+        ana.mover(40, 40);
         pedirCasa(1, 1);
         assertNull(campo("jugadorPendientePago"));
         pedirCasa(0, -1);
@@ -100,6 +102,7 @@ class GameServerCasasTest {
     }
 
     @Test void permiteDespuesDeTirarYCancelaPagoAlCambiarTurno() throws Exception {
+        ana.mover(40, 40);
         asignar("yaTiro", true);
         pedirCasa(0, 1);
         servidor.recibirTarjetaDelCajero("ABC0");
@@ -109,5 +112,20 @@ class GameServerCasasTest {
         servidor.recibirTarjetaDelCajero("ABC0");
         assertEquals(0, propiedad(3).getCantidadCasas());
         assertNull(campo("jugadorPendientePago"));
+    }
+
+    @Test void exigeVueltaDesdeCompraAunquePoseaGrupoCompleto() throws Exception {
+        pedirCasa(0, 1);
+        assertNull(campo("jugadorPendientePago"));
+        ana.mover(39, 40);
+        pedirCasa(0, 1);
+        assertNull(campo("jugadorPendientePago"));
+        Message.EstadoJuego estado = (Message.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
+        assertTrue(estado.propiedades()[1].motivoNoComprarCasa().contains("1 casillas"));
+        ana.mover(1, 40);
+        pedirCasa(0, 1);
+        assertSame(ana, campo("jugadorPendientePago"));
+        servidor.recibirTarjetaDelCajero("ABC0");
+        assertEquals(1, propiedad(1).getCantidadCasas());
     }
 }
