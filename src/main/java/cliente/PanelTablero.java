@@ -5,6 +5,7 @@ import modelo.CasillaEspecial;
 import modelo.CasillaEvento;
 import modelo.Propiedad;
 import modelo.Tablero;
+import protocolo.Message;
 
 import javax.swing.JPanel;
 import javax.swing.Timer;
@@ -41,6 +42,12 @@ public class PanelTablero extends JPanel {
     private static final Color RESALTADO = new Color(0xFFC107);
 
     private final Tablero tablero;
+    private Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[40];
+
+    public void actualizarPropiedades(Message.EstadoPropiedad[] propiedades) {
+        this.propiedades = propiedades.clone();
+        repaint();
+    }
 
     // Al pintar se guarda dónde quedó cada casilla; el clic busca en este arreglo.
     private final Rectangle[] rectangulos = new Rectangle[40];
@@ -331,6 +338,7 @@ public class PanelTablero extends JPanel {
                 case DERECHA -> { g2.fillRect(r.x, r.y, grosor, r.height); areaTexto.x += grosor; areaTexto.width -= grosor; }
                 default -> { }
             }
+            dibujarConstrucciones(g2, p, r, lado, grosor);
         } else if (casilla instanceof CasillaEvento ev) {
             g2.setColor(ev.getTipo() == CasillaEvento.Tipo.SUERTE ? new Color(0xFFE8C2) : new Color(0xD6ECFA));
             g2.fill(r);
@@ -371,9 +379,53 @@ public class PanelTablero extends JPanel {
         }
     }
 
-    /** Segunda línea de la casilla: precio, símbolo o monto. Vacío si no aplica. */
+    /** Casas verdes sobre la franja de color, orientadas hacia el centro del tablero. */
+    private void dibujarConstrucciones(Graphics2D g2, Propiedad propiedad, Rectangle r, Lado lado, int grosor) {
+        Message.EstadoPropiedad estado = propiedades[propiedad.getId()];
+        int casas = estado == null ? propiedad.getCantidadCasas() : estado.casas();
+        boolean hotel = estado == null ? propiedad.tieneHotel() : estado.hotel();
+        if (casas == 0 && !hotel) return;
+        Graphics2D dibujo = (Graphics2D) g2.create();
+        try {
+            switch (lado) {
+                case ABAJO -> dibujo.translate(r.getCenterX(), r.y + grosor / 2.0);
+                case ARRIBA -> { dibujo.translate(r.getCenterX(), r.y + r.height - grosor / 2.0); dibujo.rotate(Math.PI); }
+                case IZQUIERDA -> { dibujo.translate(r.x + r.width - grosor / 2.0, r.getCenterY()); dibujo.rotate(Math.PI / 2); }
+                case DERECHA -> { dibujo.translate(r.x + grosor / 2.0, r.getCenterY()); dibujo.rotate(-Math.PI / 2); }
+                default -> { return; }
+            }
+            int anchoFranja = lado == Lado.ABAJO || lado == Lado.ARRIBA ? r.width : r.height;
+            int tamano = Math.max(3, Math.min(grosor - 3, (anchoFranja - 8) / 4 - 2));
+            int cantidad = hotel ? 1 : casas;
+            int ancho = hotel ? tamano * 2 : tamano;
+            int total = cantidad * ancho + (cantidad - 1) * 3;
+            dibujo.setStroke(new BasicStroke(1f));
+            for (int i = 0; i < cantidad; i++) {
+                int x = -total / 2 + i * (ancho + 3);
+                int y = -tamano / 2;
+                java.awt.Polygon silueta = new java.awt.Polygon(
+                        new int[]{x, x + ancho / 2, x + ancho, x + ancho, x},
+                        new int[]{y + tamano / 3, y, y + tamano / 3, y + tamano, y + tamano}, 5);
+                dibujo.setColor(Color.WHITE);
+                dibujo.draw(silueta);
+                dibujo.setColor(new Color(hotel ? 0xD32F2F : 0x008F39));
+                dibujo.fill(silueta);
+                dibujo.setColor(new Color(0x163A22));
+                dibujo.draw(silueta);
+                dibujo.setColor(Color.WHITE);
+                dibujo.fillRect(x + ancho / 2 - 1, y + tamano * 2 / 3, 2, Math.max(2, tamano / 3));
+            }
+        } finally {
+            dibujo.dispose();
+        }
+    }
+
+    /** Segunda línea de la casilla: precio, renta, símbolo o monto. */
     private String detalleDe(Casilla casilla) {
-        if (casilla instanceof Propiedad p) return "₡" + p.getPrecio();
+        if (casilla instanceof Propiedad p) {
+            Message.EstadoPropiedad estado = propiedades[p.getId()];
+            return estado != null && estado.propietario() >= 0 ? "Renta ₡" + estado.renta() : "₡" + p.getPrecio();
+        }
         if (casilla instanceof CasillaEvento ev) return ev.getTipo() == CasillaEvento.Tipo.SUERTE ? "?" : "▣";
         if (casilla instanceof CasillaEspecial esp) {
             return switch (esp.getTipo()) {

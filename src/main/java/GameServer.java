@@ -95,6 +95,7 @@ public class GameServer {
     private Jugador jugadorPendientePago;
     private Propiedad propiedadPendientePago;
     private int computadoraPendientePago = -1;
+    private boolean pagoPendienteCasa;
 
 
     // =========================================================
@@ -277,6 +278,10 @@ public class GameServer {
                 else if (mensaje instanceof Message.ComprarPropiedad) {
 
                     comprarPropiedad(playerId, out);
+                }
+
+                else if (mensaje instanceof Message.ComprarCasa compra) {
+                    comprarCasa(playerId, out, compra.idPropiedad());
                 }
 
                 else if (mensaje instanceof Message.TerminarTurno) {
@@ -1083,6 +1088,9 @@ public class GameServer {
             if (error == null && !yaTiro) {
                 error = "Primero hay que tirar los dados.";
             }
+            if (error == null && jugadorPendientePago != null) {
+                error = "Ya hay una compra esperando el pago con tarjeta.";
+            }
 
             if (error != null) {
                 escribir(out, new Message.Aviso(error));
@@ -1122,6 +1130,7 @@ public class GameServer {
             jugadorPendientePago = actual;
             propiedadPendientePago = propiedad;
             computadoraPendientePago = computadora;
+            pagoPendienteCasa = false;
 
             escribir(out, new Message.Aviso(
                     actual.getNombre()
@@ -1129,6 +1138,36 @@ public class GameServer {
                             + propiedad.getPrecioCompra()
                             + " y comprar " + propiedad.getNombre() + "."
             ));
+        }
+    }
+
+    private void comprarCasa(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
+        synchronized (gameLock) {
+            String error = validarTurno(computadora);
+            if (error == null && jugadorPendientePago != null) error = "Ya hay una compra esperando el pago con tarjeta.";
+            Propiedad propiedad = null;
+            if (error == null) {
+                if (idPropiedad < 0 || idPropiedad >= tablero.tamaño()
+                        || !(tablero.obtenerCasilla(idPropiedad) instanceof Propiedad)) {
+                    error = "Selecciona una propiedad válida.";
+                } else {
+                    propiedad = (Propiedad) tablero.obtenerCasilla(idPropiedad);
+                    error = juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), propiedad);
+                }
+            }
+            if (error == null && !juego.getJugadorActual().tieneTarjetaRegistrada()) error = "El jugador no tiene tarjeta RFID registrada.";
+            if (error != null) {
+                escribir(out, new Message.Aviso(error));
+                if (juego != null) escribir(out, crearEstado());
+                return;
+            }
+            jugadorPendientePago = juego.getJugadorActual();
+            propiedadPendientePago = propiedad;
+            computadoraPendientePago = computadora;
+            pagoPendienteCasa = true;
+            escribir(out, new Message.Aviso(jugadorPendientePago.getNombre()
+                    + ", acerque su tarjeta RFID para pagar ₡" + propiedad.getPrecioCasa()
+                    + " y comprar una casa en " + propiedad.getNombre() + "."));
         }
     }
 
@@ -1197,6 +1236,11 @@ public class GameServer {
             }
 
             juego.terminarTurnoActual();
+
+            jugadorPendientePago = null;
+            propiedadPendientePago = null;
+            computadoraPendientePago = -1;
+            pagoPendienteCasa = false;
 
             yaTiro = false;
 
@@ -1332,6 +1376,19 @@ public class GameServer {
                         && casillaActual instanceof Propiedad propiedad
                         && !propiedad.tienePropietario();
 
+        Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[tablero.tamaño()];
+        for (int i = 0; i < tablero.tamaño(); i++) {
+            if (tablero.obtenerCasilla(i) instanceof Propiedad p) {
+                int propietario = -1;
+                for (int j = 0; j < jugadores.length; j++) {
+                    if (jugadores[j] == p.getPropietario()) propietario = j;
+                }
+                propiedades[i] = new Message.EstadoPropiedad(i, propietario, p.getCantidadCasas(),
+                        p.tieneHotel(), p.estaHipotecada(), p.calcularAlquiler(), p.getPrecioCasa(),
+                        juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), p));
+            }
+        }
+
         return new Message.EstadoJuego(
                 juego.getTurnoActualGlobal(),
                 juego.getMaxTurnos(),
@@ -1344,7 +1401,9 @@ public class GameServer {
                 puedeComprar,
                 juego.esFinDeJuego(),
                 enCarcel,
-                cartasCarcel
+                cartasCarcel,
+                propiedades,
+                juego.getBanco().getCasasDisponibles()
         );
     }
 
@@ -1468,21 +1527,24 @@ public class GameServer {
                 Jugador jugador = jugadorPendientePago;
                 Propiedad propiedad = propiedadPendientePago;
                 int computadora = computadoraPendientePago;
+                boolean compraCasa = pagoPendienteCasa;
 
                 jugadorPendientePago = null;
                 propiedadPendientePago = null;
                 computadoraPendientePago = -1;
+                pagoPendienteCasa = false;
 
-                if (!juego.getBanco().comprarPropiedadConTarjeta(
-                        jugador, propiedad, uid
-                )) {
+                if (juego.esFinDeJuego() || juego.getJugadorActual() != jugador
+                        || !(compraCasa ? juego.getBanco().comprarCasa(jugador, propiedad)
+                        : juego.getBanco().comprarPropiedadConTarjeta(jugador, propiedad, uid))) {
                     avisarComputadora(computadora, "No se pudo realizar el pago.");
+                    difundir(crearEstado());
                     return;
                 }
 
                 difundir(new Message.Aviso(
                         "¡" + jugador.getNombre() + " pagó con su tarjeta y compró "
-                                + propiedad.getNombre() + "!"
+                                + (compraCasa ? "una casa en " : "") + propiedad.getNombre() + "!"
                 ));
                 difundir(crearEstado());
                 return;

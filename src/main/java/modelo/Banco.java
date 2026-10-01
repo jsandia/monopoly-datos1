@@ -430,51 +430,10 @@ public class Banco {
     ) {
         int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
 
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // El jugador debe ser el dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // No se puede construir sobre una propiedad hipotecada.
-        if (propiedad.estaHipotecada()) {
-            return false;
-        }
-
-        // No se pueden construir casas si ya existe hotel.
-        if (propiedad.tieneHotel()) {
-            return false;
-        }
-
-        // Máximo 4 casas.
-        if (propiedad.getCantidadCasas() >= 4) {
-            return false;
-        }
-
-        // El banco debe tener casas disponibles.
-        if (casasDisponibles <= 0) {
-            return false;
-        }
+        if (motivoNoComprarCasa(jugador, propiedad) != null) return false;
 
         int precio =
                 propiedad.getPrecioCasa();
-
-        if (precio <= 0) {
-            return false;
-        }
-
-        // Primero comprobamos si puede pagar.
-        if (jugador.getSaldo() < precio) {
-            return false;
-        }
 
         // Quitamos el dinero.
         if (!jugador.debitar(precio)) {
@@ -501,6 +460,20 @@ public class Banco {
         return true;
     }
 
+
+    // =========================================================
+    // DISPONIBILIDAD DE CASAS
+    // =========================================================
+
+    /** Devuelve null si se permite la compra; de lo contrario, explica el motivo. */
+    public synchronized String motivoNoComprarCasa(Jugador jugador, Propiedad propiedad) {
+        if (propiedad == null) return "Selecciona una propiedad válida.";
+        String motivo = propiedad.motivoNoConstruir(jugador);
+        if (motivo != null) return motivo;
+        if (casasDisponibles <= 0) return "El banco no tiene casas disponibles.";
+        if (jugador.getSaldo() < propiedad.getPrecioCasa()) return "Saldo insuficiente para comprar una casa.";
+        return null;
+    }
 
     // =========================================================
     // VENDER CASA

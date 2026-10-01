@@ -53,6 +53,9 @@ public class VentanaTablero extends JFrame {
     private final JButton botonPagarMulta = new JButton("🔓 Pagar multa de la cárcel");
     private final JButton botonUsarCarta = new JButton("🃏 Usar carta \"Salga de la cárcel\"");
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
+    private final JButton botonComprarCasa = new JButton("Comprar casas");
+    private Message.EstadoJuego ultimoEstado;
+    private Casilla casillaSeleccionada;
     private VentanaHistorial ventanaHistorial;
     private String[] nombresJugadores = new String[0];
 
@@ -157,6 +160,8 @@ public class VentanaTablero extends JFrame {
 
         botonLanzarDados.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         botonComprar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonComprarCasa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        botonComprarCasa.setEnabled(false);
         botonTerminarTurno.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         botonPagarMulta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         botonUsarCarta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
@@ -176,6 +181,8 @@ public class VentanaTablero extends JFrame {
         panelBotones.add(botonLanzarDados);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonComprar);
+        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
+        panelBotones.add(botonComprarCasa);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
         panelBotones.add(botonTerminarTurno);
         panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
@@ -198,10 +205,22 @@ public class VentanaTablero extends JFrame {
     }
 
     private void mostrarCasilla(Casilla casilla) {
+        casillaSeleccionada = casilla;
         etiquetaNombre.setText(casilla.getNombre());
         etiquetaTipo.setText("Casilla #" + casilla.getId() + " · " + tipoDe(casilla));
         // getDescripcion() ejecuta la versión de la hija real (polimorfismo)
         areaDescripcion.setText(casilla.getDescripcion());
+        if (casilla instanceof Propiedad p && ultimoEstado != null) {
+            Message.EstadoPropiedad estado = ultimoEstado.propiedades()[p.getId()];
+            if (estado != null) {
+                String propietario = estado.propietario() < 0 ? "Sin dueño" : ultimoEstado.nombres()[estado.propietario()];
+                areaDescripcion.setText("Grupo: " + p.getGrupo() + "\nPrecio: ₡" + p.getPrecio()
+                        + "\nDueño: " + propietario + "\nRenta actual: ₡" + estado.renta()
+                        + "\nCasas: " + estado.casas() + " | Hotel: " + (estado.hotel() ? "Sí" : "No")
+                        + "\nHipotecada: " + (estado.hipotecada() ? "Sí" : "No")
+                        + (p.esEdificable() ? "\nPrecio por casa: ₡" + estado.precioCasa() : ""));
+            }
+        }
     }
 
     private String tipoDe(Casilla casilla) {
@@ -278,6 +297,9 @@ public class VentanaTablero extends JFrame {
 
     /** Pone la ventana igual a lo que dice el servidor. */
     private void aplicarEstado(Message.EstadoJuego estado) {
+        ultimoEstado = estado;
+        panelTablero.actualizarPropiedades(estado.propiedades());
+        if (casillaSeleccionada != null) mostrarCasilla(casillaSeleccionada);
         nombresJugadores = estado.nombres().clone();
         botonHistorial.setEnabled(true);
         int enTurno = estado.enTurno();
@@ -328,6 +350,12 @@ public class VentanaTablero extends JFrame {
         // Igual el servidor vuelve a revisar todo: esto es solo comodidad.
         botonLanzarDados.setEnabled(esMiTurno && !estado.yaTiro());
         botonComprar.setEnabled(esMiTurno && estado.puedeComprar());
+        boolean tienePropiedadEdificable = false;
+        for (Message.EstadoPropiedad p : estado.propiedades()) {
+            if (p != null && p.propietario() == enTurno && p.precioCasa() > 0) tienePropiedadEdificable = true;
+        }
+        botonComprarCasa.setEnabled(esMiTurno && tienePropiedadEdificable);
+        botonComprarCasa.setToolTipText("Construye en tus propiedades durante tu turno, antes o después de tirar.");
         botonTerminarTurno.setEnabled(esMiTurno && estado.yaTiro());
         boolean presoSinTirar = esMiTurno && !estado.yaTiro() && estado.enCarcel()[enTurno];
         botonPagarMulta.setEnabled(presoSinTirar);
@@ -348,6 +376,7 @@ public class VentanaTablero extends JFrame {
     }
 
     private void configurarEventosBotones() {
+        botonComprarCasa.addActionListener(evento -> elegirPropiedadParaCasa());
         botonHistorial.addActionListener(evento -> {
             if (ventanaHistorial == null || !ventanaHistorial.isDisplayable()) {
                 ventanaHistorial = new VentanaHistorial(this, nombresJugadores, enviar);
@@ -384,6 +413,41 @@ public class VentanaTablero extends JFrame {
         areaConsola.append(mensaje + "\n");
         // Mueve el cursor al final: el JScrollPane baja solo hasta el último mensaje
         areaConsola.setCaretPosition(areaConsola.getDocument().getLength());
+    }
+
+    private void elegirPropiedadParaCasa() {
+        if (ultimoEstado == null) return;
+        javax.swing.JComboBox<OpcionCasa> opciones = new javax.swing.JComboBox<>();
+        for (Message.EstadoPropiedad p : ultimoEstado.propiedades()) {
+            if (p != null && p.propietario() == ultimoEstado.enTurno() && p.precioCasa() > 0) {
+                opciones.addItem(new OpcionCasa(p, modeloTablero.obtenerCasilla(p.id()).getNombre()));
+            }
+        }
+        JTextArea reglas = new JTextArea("Debes tener todo el grupo de color y construir uniformemente.\n"
+                + "Máximo 4 casas por propiedad. Casas disponibles: " + ultimoEstado.casasDisponibles());
+        reglas.setEditable(false);
+        reglas.setOpaque(false);
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.add(reglas, BorderLayout.NORTH);
+        panel.add(opciones, BorderLayout.CENTER);
+        if (JOptionPane.showConfirmDialog(this, panel, "Comprar una casa", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
+        OpcionCasa opcion = (OpcionCasa) opciones.getSelectedItem();
+        if (opcion == null) return;
+        if (opcion.estado().motivoNoComprarCasa() != null) {
+            JOptionPane.showMessageDialog(this, opcion.estado().motivoNoComprarCasa(), "No se puede construir",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        botonComprarCasa.setEnabled(false);
+        enviar.accept(new Message.ComprarCasa(opcion.estado().id()));
+    }
+
+    private record OpcionCasa(Message.EstadoPropiedad estado, String nombre) {
+        @Override public String toString() {
+            return nombre + " — " + estado.casas() + " casas — ₡" + estado.precioCasa()
+                    + (estado.motivoNoComprarCasa() == null ? "" : " (no disponible)");
+        }
     }
 
     public static void main(String[] args) {

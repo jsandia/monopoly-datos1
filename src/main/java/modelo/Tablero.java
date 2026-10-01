@@ -79,7 +79,21 @@ public class Tablero {
     // Así el id siempre coincide con la posición y no hay que numerar a mano.
 
     private void propiedad(String nombre, String grupo, int precio, int alquiler) {
-        casillas.agregarAlFinal(new Propiedad(casillas.tamaño(), nombre, grupo, precio, alquiler));
+        Propiedad propiedad = new Propiedad(casillas.tamaño(), nombre, grupo, precio, alquiler);
+        propiedad.setTablero(this);
+        casillas.agregarAlFinal(propiedad);
+    }
+
+    public boolean tieneGrupoCompleto(Jugador jugador, String grupo) {
+        if (jugador == null) return false;
+        boolean encontrado = false;
+        for (int i = 0; i < tamaño(); i++) {
+            if (obtenerCasilla(i) instanceof Propiedad p && p.getGrupo().equals(grupo)) {
+                encontrado = true;
+                if (p.getPropietario() != jugador) return false;
+            }
+        }
+        return encontrado;
     }
 
     private void evento(String nombre, CasillaEvento.Tipo tipo) {
