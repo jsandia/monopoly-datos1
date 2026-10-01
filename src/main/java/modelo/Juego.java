@@ -120,7 +120,7 @@ public class Juego {
     /**
      * Aplica una tirada al jugador en turno con todas las reglas:
      * si esta preso intenta salir; si se mueve, cobra Salida al pasar
-     * y resuelve la casilla donde cae (cartas, "Vaya a la carcel").
+     * y resuelve la casilla donde cae (alquileres, impuestos, cartas y carcel).
      *
      * @return lo que paso, una linea por evento, para mostrar a los jugadores
      */
@@ -227,7 +227,35 @@ public class Juego {
     private void resolverCasilla(Jugador jugador, StringBuilder log) {
         Casilla casilla = tablero.obtenerCasilla(jugador.getPosicionActual());
 
-        if (casilla instanceof CasillaEspecial especial
+        if (casilla instanceof Propiedad propiedad) {
+            Jugador propietario = propiedad.getPropietario();
+            if (propietario == null || propietario == jugador || propiedad.estaHipotecada()) {
+                return;
+            }
+
+            int alquiler = propiedad.calcularAlquiler();
+            if (banco.cobrarAlquiler(jugador, propiedad)) {
+                log.append("\n").append(jugador.getNombre()).append(" paga ₡")
+                        .append(alquiler).append(" de alquiler a ")
+                        .append(propietario.getNombre()).append(" por ")
+                        .append(propiedad.getNombre()).append(".");
+            } else if (jugador.getSaldo() < alquiler) {
+                log.append("\n").append(jugador.getNombre())
+                        .append(" no tiene suficiente saldo para pagar ₡")
+                        .append(alquiler).append(" de alquiler a ")
+                        .append(propietario.getNombre()).append(".");
+            }
+        } else if (casilla instanceof CasillaEspecial especial
+                && especial.getTipo() == CasillaEspecial.Tipo.IMPUESTO) {
+            if (banco.cobrarImpuesto(jugador, especial.getMonto())) {
+                log.append("\n").append(jugador.getNombre()).append(" paga ₡")
+                        .append(especial.getMonto()).append(" de impuesto al banco.");
+            } else {
+                log.append("\n").append(jugador.getNombre())
+                        .append(" no tiene suficiente saldo para pagar el impuesto de ₡")
+                        .append(especial.getMonto()).append(".");
+            }
+        } else if (casilla instanceof CasillaEspecial especial
                 && especial.getTipo() == CasillaEspecial.Tipo.IR_A_CARCEL) {
             enviarACarcel(jugador, log);
 
@@ -324,6 +352,7 @@ public class Juego {
                     pasos++;
                 } while (!(nodo.getDato() instanceof Propiedad p && p.getGrupo().equals("Transporte")));
                 avanzar(jugador, pasos, log);
+                resolverCasilla(jugador, log);
             }
 
             case RETROCEDER -> {
