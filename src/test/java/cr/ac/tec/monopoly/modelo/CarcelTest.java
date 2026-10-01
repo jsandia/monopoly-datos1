@@ -1,5 +1,6 @@
 package cr.ac.tec.monopoly.modelo;
 
+import config.Configuracion;
 import estructuras.ColaCircular;
 import modelo.*;
 import org.junit.jupiter.api.AfterEach;
@@ -34,7 +35,7 @@ class CarcelTest {
         juego.jugarTiro(2, 3); // 25 + 5 = 30, "Vaya a la cárcel"
 
         assertTrue(ana.isEnCarcel());
-        assertEquals(Juego.POSICION_CARCEL, ana.getPosicionActual());
+        assertEquals(Configuracion.POSICION_CARCEL, ana.getPosicionActual());
         assertEquals(1500, ana.getSaldo()); // de 30 a 10 "hacia atrás", pero no cobra Salida
     }
 
@@ -47,7 +48,7 @@ class CarcelTest {
 
     @Test
     void conDoblesSaleYAvanzaLaSuma() {
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         juego.jugarTiro(3, 3);
 
         assertFalse(ana.isEnCarcel());
@@ -56,17 +57,17 @@ class CarcelTest {
 
     @Test
     void sinDoblesSeQuedaQuieto() {
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         juego.jugarTiro(1, 2);
 
         assertTrue(ana.isEnCarcel());
-        assertEquals(Juego.POSICION_CARCEL, ana.getPosicionActual());
+        assertEquals(Configuracion.POSICION_CARCEL, ana.getPosicionActual());
         assertEquals(1, ana.getTurnosEnCarcel());
     }
 
     @Test
     void alTercerIntentoPagaLaMultaYAvanza() {
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         juego.jugarTiro(1, 2);
         juego.jugarTiro(1, 2);
         assertTrue(ana.isEnCarcel());
@@ -75,13 +76,13 @@ class CarcelTest {
 
         assertFalse(ana.isEnCarcel());
         assertEquals(13, ana.getPosicionActual());
-        assertEquals(1500 - Juego.MULTA_CARCEL, ana.getSaldo());
+        assertEquals(1500 - Configuracion.MULTA_CARCEL, ana.getSaldo());
     }
 
     @Test
     void siNoLeAlcanzaParaLaMultaSigueEnLaCarcel() {
         ana.setSaldo(10);
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         juego.jugarTiro(1, 2);
         juego.jugarTiro(1, 2);
         juego.jugarTiro(1, 2);
@@ -92,11 +93,11 @@ class CarcelTest {
 
     @Test
     void pagarLaMultaLoLibera() {
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
 
         assertTrue(juego.pagarMultaCarcel());
         assertFalse(ana.isEnCarcel());
-        assertEquals(1500 - Juego.MULTA_CARCEL, ana.getSaldo());
+        assertEquals(1500 - Configuracion.MULTA_CARCEL, ana.getSaldo());
     }
 
     @Test
@@ -115,7 +116,7 @@ class CarcelTest {
         ana.guardarCartaSalirCarcel(mazo.desencolar());
         assertEquals(9, mazo.tamaño());
 
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         assertTrue(juego.usarCartaSalirCarcel());
 
         assertFalse(ana.isEnCarcel());
@@ -126,7 +127,7 @@ class CarcelTest {
 
     @Test
     void sinCartaNoPuedeUsarla() {
-        ana.enviarACarcel(Juego.POSICION_CARCEL);
+        ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         assertFalse(juego.usarCartaSalirCarcel());
         assertTrue(ana.isEnCarcel());
     }

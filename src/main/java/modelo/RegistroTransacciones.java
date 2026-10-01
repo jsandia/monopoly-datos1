@@ -1,4 +1,5 @@
 package modelo;
+import config.Configuracion;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,7 +22,7 @@ public final class RegistroTransacciones {
     private String errorEscritura;
 
     public RegistroTransacciones(String codigo) {
-        this(codigo, Path.of("transacciones"));
+        this(codigo, Path.of(Configuracion.CARPETA_TRANSACCIONES));
     }
 
     public RegistroTransacciones(String codigo, Path carpeta) {

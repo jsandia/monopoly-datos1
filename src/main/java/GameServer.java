@@ -1,3 +1,4 @@
+import config.Configuracion;
 import protocolo.Message;
 import modelo.Casilla;
 import modelo.Juego;
@@ -10,12 +11,6 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class GameServer {
-
-    // No usar 5000: en macOS lo ocupa el Receptor AirPlay (ControlCenter)
-    public static final int DEFAULT_PORT = 5100;
-
-    // Puerto aparte para el cajero (Pico 2W). Habla texto, no objetos Java
-    public static final int PUERTO_CAJERO = 5050;
 
     private final int port;
 
@@ -68,8 +63,6 @@ public class GameServer {
     private final ObjectOutputStream[] salidas =
             new ObjectOutputStream[2];
 
-    private static final int MAX_TURNOS = 100;
-    private static final int SALDO_INICIAL = 1500; // como el Monopoly original
 
     // null mientras no se hayan unido las 2 computadoras
     private Juego juego;
@@ -77,7 +70,7 @@ public class GameServer {
 
     // Los 4 jugadores en orden de turno. Juego los guarda en su cola,
     // pero no deja recorrerlos, y el estado necesita los 4.
-    private final Jugador[] jugadores = new Jugador[4];
+    private final Jugador[] jugadores = new Jugador[Configuracion.CANTIDAD_JUGADORES];
 
     // jugadores[i] se juega desde la computadora computadoraDe[i]
     private final int[] computadoraDe = new int[4];
@@ -104,7 +97,7 @@ public class GameServer {
     // =========================================================
 
     public GameServer() {
-        this(DEFAULT_PORT);
+        this(Configuracion.PUERTO_JUEGO);
     }
 
     public GameServer(int port) {
@@ -949,7 +942,7 @@ public class GameServer {
 
         synchronized (gameLock) {
 
-            juego = new Juego(MAX_TURNOS, 4, partida.codigo);
+            juego = new Juego(Configuracion.MAX_TURNOS, Configuracion.CANTIDAD_JUGADORES, partida.codigo);
 
             // Un solo tablero: el mismo con el que Juego mueve y resuelve las casillas
             tablero = juego.getTablero();
@@ -961,10 +954,10 @@ public class GameServer {
                     partida.jugador4
             };
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
 
                 jugadores[i] =
-                        new Jugador("J" + (i + 1), nombres[i], SALDO_INICIAL);
+                        new Jugador("J" + (i + 1), nombres[i], Configuracion.SALDO_INICIAL);
 
                 if (partida.tarjetas[i] != null) {
                     jugadores[i].registrarTarjeta(partida.tarjetas[i]);
@@ -1216,14 +1209,14 @@ public class GameServer {
 
             if (!salio) {
                 escribir(out, new Message.Aviso(conMulta
-                        ? "Saldo insuficiente para pagar la multa de ₡" + Juego.MULTA_CARCEL + "."
+                        ? "Saldo insuficiente para pagar la multa de ₡" + Configuracion.MULTA_CARCEL + "."
                         : actual.getNombre() + " no tiene cartas para salir de la cárcel."));
                 return;
             }
 
             difundir(new Message.Aviso(actual.getNombre()
                     + (conMulta
-                        ? " paga ₡" + Juego.MULTA_CARCEL + " y sale de la cárcel."
+                        ? " paga ₡" + Configuracion.MULTA_CARCEL + " y sale de la cárcel."
                         : " usa su carta y sale de la cárcel.")
                     + " Ahora puede tirar los dados."));
 
@@ -1365,13 +1358,13 @@ public class GameServer {
         String errorHistorial = juego.getRegistroTransacciones().getErrorEscritura();
         if (errorHistorial != null) difundir(new Message.Aviso(errorHistorial));
 
-        String[] nombres = new String[4];
-        int[] saldos = new int[4];
-        int[] posiciones = new int[4];
-        boolean[] enCarcel = new boolean[4];
-        int[] cartasCarcel = new int[4];
+        String[] nombres = new String[Configuracion.CANTIDAD_JUGADORES];
+        int[] saldos = new int[Configuracion.CANTIDAD_JUGADORES];
+        int[] posiciones = new int[Configuracion.CANTIDAD_JUGADORES];
+        boolean[] enCarcel = new boolean[Configuracion.CANTIDAD_JUGADORES];
+        int[] cartasCarcel = new int[Configuracion.CANTIDAD_JUGADORES];
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
 
             nombres[i] = jugadores[i].getNombre();
             saldos[i] = jugadores[i].getSaldo();
@@ -1425,7 +1418,7 @@ public class GameServer {
 
 
     // =========================================================
-    // CAJERO (Pico 2W): SERVIDOR APARTE EN EL PUERTO 5050
+    // CAJERO (Pico 2W): SERVIDOR APARTE EN Configuracion.PUERTO_CAJERO
     // =========================================================
 
     private void iniciarServidorCajero() {
@@ -1436,11 +1429,11 @@ public class GameServer {
 
             try {
 
-                servidorCajero = new ServerSocket(PUERTO_CAJERO);
+                servidorCajero = new ServerSocket(Configuracion.PUERTO_CAJERO);
 
                 System.out.println(
                         "Esperando al cajero en el puerto "
-                                + PUERTO_CAJERO
+                                + Configuracion.PUERTO_CAJERO
                 );
 
                 while (true) {

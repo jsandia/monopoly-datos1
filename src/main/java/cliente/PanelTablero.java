@@ -1,5 +1,6 @@
 package cliente;
 
+import config.Configuracion;
 import modelo.Casilla;
 import modelo.CasillaEspecial;
 import modelo.CasillaEvento;
@@ -62,9 +63,7 @@ public class PanelTablero extends JPanel {
     // FICHAS DE LOS JUGADORES
     // =========================================================
 
-    private static final int CANTIDAD_JUGADORES = 4;
-    private static final int PASO_FICHA_MS = 230;   // tiempo que tarda la ficha en saltar de una casilla a la siguiente
-    private static final int MAX_PASOS_ANIMADOS = 12; // más que un tiro de dados: es un salto (ej. "Vaya a la cárcel")
+    // Configuracion.CANTIDAD_JUGADORES, Configuracion.PASO_FICHA_MS y Configuracion.MAX_PASOS_ANIMADOS están en Configuracion
 
     private static final Color[] COLORES_FICHAS = {
             new Color(0xE53935), // jugador 1: rojo
@@ -76,7 +75,7 @@ public class PanelTablero extends JPanel {
     // Casilla donde se DIBUJA cada ficha ahora mismo (-1 = todavía no se sabe)
     private final int[] posicionVisible = {-1, -1, -1, -1};
     // Casilla donde el servidor dice que está cada jugador
-    private final int[] posicionDestino = new int[CANTIDAD_JUGADORES];
+    private final int[] posicionDestino = new int[Configuracion.CANTIDAD_JUGADORES];
     private final String[] nombresJugadores = {"1", "2", "3", "4"};
     private int jugadorEnTurno = -1;
     private Timer temporizadorFichas; // != null mientras alguna ficha está caminando
@@ -129,7 +128,7 @@ public class PanelTablero extends JPanel {
     public void actualizarFichas(int[] posiciones, String[] nombres, int enTurno) {
         jugadorEnTurno = enTurno;
 
-        for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+        for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
             if (nombres != null && nombres[i] != null && !nombres[i].isBlank()) {
                 nombresJugadores[i] = nombres[i].trim();
             }
@@ -140,15 +139,15 @@ public class PanelTablero extends JPanel {
                 posicionVisible[i] = posiciones[i]; // primera vez: sin animación
             } else {
                 int pasos = Math.floorMod(posicionDestino[i] - posicionVisible[i], 40);
-                if (pasos > MAX_PASOS_ANIMADOS) {
+                if (pasos > Configuracion.MAX_PASOS_ANIMADOS) {
                     posicionVisible[i] = posicionDestino[i];
                 }
             }
         }
 
         if (hayFichaCaminando() && temporizadorFichas == null) {
-            temporizadorFichas = new Timer(PASO_FICHA_MS, e -> {
-                for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+            temporizadorFichas = new Timer(Configuracion.PASO_FICHA_MS, e -> {
+                for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
                     if (posicionVisible[i] != posicionDestino[i]) {
                         posicionVisible[i] = (posicionVisible[i] + 1) % 40; // una casilla hacia adelante
                     }
@@ -166,7 +165,7 @@ public class PanelTablero extends JPanel {
     }
 
     private boolean hayFichaCaminando() {
-        for (int i = 0; i < CANTIDAD_JUGADORES; i++) {
+        for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
             if (posicionVisible[i] != posicionDestino[i]) return true;
         }
         return false;
@@ -226,9 +225,9 @@ public class PanelTablero extends JPanel {
             if (rectangulos[casilla] == null) continue;
 
             // Jugadores (por índice) que están dibujados en esta casilla
-            int[] aqui = new int[CANTIDAD_JUGADORES];
+            int[] aqui = new int[Configuracion.CANTIDAD_JUGADORES];
             int cantidad = 0;
-            for (int j = 0; j < CANTIDAD_JUGADORES; j++) {
+            for (int j = 0; j < Configuracion.CANTIDAD_JUGADORES; j++) {
                 if (posicionVisible[j] == casilla) aqui[cantidad++] = j;
             }
             if (cantidad == 0) continue;

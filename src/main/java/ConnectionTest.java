@@ -1,3 +1,4 @@
+import config.Configuracion;
 import protocolo.Message;
 import java.io.*;
 import java.net.*;
@@ -23,8 +24,6 @@ import java.util.Scanner;
  */
 public class ConnectionTest {
 
-    private static final int TEST_PORT = 5050; // puerto distinto al del juego (5000), para no chocar
-
     public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
         String modo = (args.length > 0) ? args[0] : preguntarModo();
 
@@ -49,9 +48,9 @@ public class ConnectionTest {
     }
 
     private static void runHost() throws IOException, ClassNotFoundException {
-        try (ServerSocket serverSocket = new ServerSocket(TEST_PORT)) {
+        try (ServerSocket serverSocket = new ServerSocket(Configuracion.PUERTO_PRUEBA_CONEXION)) {
             System.out.println("Anunciándose en la red y esperando a la otra computadora...");
-            Discovery.hostAnnounce(TEST_PORT);
+            Discovery.hostAnnounce(Configuracion.PUERTO_PRUEBA_CONEXION);
 
             try (Socket socket = serverSocket.accept()) {
                 System.out.println("¡Conexión recibida desde " + socket.getInetAddress() + "!");
@@ -78,7 +77,7 @@ public class ConnectionTest {
 
         Discovery.HostInfo hostInfo;
         try {
-            hostInfo = Discovery.discoverHost(5000); // espera hasta 5 segundos
+            hostInfo = Discovery.discoverHost(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
         } catch (IOException e) {
             System.out.println("No se encontró ninguna computadora anunciándose.");
             System.out.println("¿Corriste 'java ConnectionTest host' en la otra máquina? ¿Están en la misma red WiFi?");

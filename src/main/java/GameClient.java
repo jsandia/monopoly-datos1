@@ -1,3 +1,4 @@
+import config.Configuracion;
 import protocolo.Message;
 import java.io.*;
 import java.net.*;
@@ -38,7 +39,7 @@ public class GameClient {
             throws IOException, ClassNotFoundException {
 
         Discovery.HostInfo host =
-                Discovery.discoverHost(5000);
+                Discovery.discoverHost(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
 
         if (host == null) {
 

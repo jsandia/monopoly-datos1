@@ -8,8 +8,6 @@ import cliente.VentanaTablero;
 
 public class Interfaz {
 
-    static final String ARCHIVO_USUARIOS = "usuarios.txt";
-    static final String ARCHIVO_PARTIDAS = "partidas.txt";
 
     // =========================================================
     // CONEXIÓN CON EL SERVIDOR

@@ -1,5 +1,6 @@
 package modelo;
 
+import config.Configuracion;
 import estructuras.ColaCircular;
 import estructuras.Nodo;
 
@@ -14,15 +15,7 @@ import estructuras.Nodo;
  */
 public class Juego {
 
-    // Montos del Monopoly original
-    public static final int PREMIO_SALIDA = 200;
-    public static final int MULTA_CARCEL = 50;
-
-    // Al tercer intento sin dobles se paga la multa obligatoriamente
-    public static final int MAX_INTENTOS_CARCEL = 3;
-
-    // Casillas fijas del tablero clasico
-    public static final int POSICION_CARCEL = 10;
+    // Los montos y reglas (Salida, multa, intentos en la carcel...) estan en Configuracion
 
     // Variables para el control de turnos y fin de juego
     private int maxTurnos;
@@ -155,24 +148,24 @@ public class Juego {
 
         jugador.sumarIntentoCarcel();
 
-        if (jugador.getTurnosEnCarcel() < MAX_INTENTOS_CARCEL) {
+        if (jugador.getTurnosEnCarcel() < Configuracion.MAX_INTENTOS_CARCEL) {
             log.append("\nNo sacó dobles. Sigue en la cárcel (intento ")
                     .append(jugador.getTurnosEnCarcel()).append(" de ")
-                    .append(MAX_INTENTOS_CARCEL).append(").");
+                    .append(Configuracion.MAX_INTENTOS_CARCEL).append(").");
             return false;
         }
 
         // Tercer intento fallido: paga la multa a la fuerza y sale
-        if (banco.cobrarMultaCarcel(jugador, MULTA_CARCEL)) {
+        if (banco.cobrarMultaCarcel(jugador, Configuracion.MULTA_CARCEL)) {
             jugador.liberarDeCarcel();
-            log.append("\nTercer intento sin dobles: paga la multa de ₡").append(MULTA_CARCEL)
+            log.append("\nTercer intento sin dobles: paga la multa de ₡").append(Configuracion.MULTA_CARCEL)
                     .append(" y sale de la cárcel.");
             return true;
         }
 
         // Todavia no hay bancarrota: si no le alcanza, se queda preso
         log.append("\nTercer intento sin dobles, pero no le alcanza para la multa de ₡")
-                .append(MULTA_CARCEL).append(". Sigue en la cárcel.");
+                .append(Configuracion.MULTA_CARCEL).append(". Sigue en la cárcel.");
         return false;
     }
 
@@ -184,7 +177,7 @@ public class Juego {
     public synchronized boolean pagarMultaCarcel() {
         Jugador actual = colaTurnos.obtenerTurnoActual();
         if (actual == null || !actual.isEnCarcel()) return false;
-        if (!banco.cobrarMultaCarcel(actual, MULTA_CARCEL)) return false;
+        if (!banco.cobrarMultaCarcel(actual, Configuracion.MULTA_CARCEL)) return false;
         actual.liberarDeCarcel();
         return true;
     }
@@ -218,8 +211,8 @@ public class Juego {
                 .append(tablero.obtenerCasilla(jugador.getPosicionActual()).getNombre()).append(".");
 
         if (jugador.getPosicionActual() < posicionAnterior) {
-            banco.pagarSalida(jugador, PREMIO_SALIDA);
-            log.append("\nPasó por Salida y cobra ₡").append(PREMIO_SALIDA).append(".");
+            banco.pagarSalida(jugador, Configuracion.PREMIO_SALIDA);
+            log.append("\nPasó por Salida y cobra ₡").append(Configuracion.PREMIO_SALIDA).append(".");
         }
     }
 
@@ -265,7 +258,7 @@ public class Juego {
     }
 
     private void enviarACarcel(Jugador jugador, StringBuilder log) {
-        jugador.enviarACarcel(POSICION_CARCEL);
+        jugador.enviarACarcel(Configuracion.POSICION_CARCEL);
         log.append("\n").append(jugador.getNombre())
                 .append(" va directo a la cárcel, sin pasar por Salida.");
     }

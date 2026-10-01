@@ -1,5 +1,6 @@
 package cr.ac.tec.monopoly.modelo;
 
+import config.Configuracion;
 import estructuras.ColaCircular;
 import modelo.*;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +69,7 @@ class CartasTest {
         caerEn(ARCA_17);
 
         assertEquals(0, ana.getPosicionActual());
-        assertEquals(1500 + Juego.PREMIO_SALIDA, ana.getSaldo());
+        assertEquals(1500 + Configuracion.PREMIO_SALIDA, ana.getSaldo());
     }
 
     @Test
@@ -77,7 +78,7 @@ class CartasTest {
         caerEn(SUERTE_36);
 
         assertEquals(24, ana.getPosicionActual());
-        assertEquals(1500 + Juego.PREMIO_SALIDA, ana.getSaldo());
+        assertEquals(1500 + Configuracion.PREMIO_SALIDA, ana.getSaldo());
     }
 
     @Test
@@ -102,7 +103,7 @@ class CartasTest {
         caerEn(SUERTE_36);
 
         assertEquals(5, ana.getPosicionActual()); // Aeropuerto Juan Santamaría
-        assertEquals(1500 + Juego.PREMIO_SALIDA, ana.getSaldo());
+        assertEquals(1500 + Configuracion.PREMIO_SALIDA, ana.getSaldo());
     }
 
     @Test
@@ -121,7 +122,7 @@ class CartasTest {
         caerEn(ARCA_17);
 
         assertTrue(ana.isEnCarcel());
-        assertEquals(Juego.POSICION_CARCEL, ana.getPosicionActual());
+        assertEquals(Configuracion.POSICION_CARCEL, ana.getPosicionActual());
         assertEquals(1500, ana.getSaldo());
     }
 

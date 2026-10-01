@@ -1,11 +1,10 @@
+import config.Configuracion;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 
 public class Discovery {
-
-    private static final int DISCOVERY_PORT = 5001;
 
     private static final String REQUEST =
             "DISCOVER_GAME_REQUEST";
@@ -31,7 +30,7 @@ public class Discovery {
         Thread thread = new Thread(() -> {
 
             try (DatagramSocket socket =
-                         new DatagramSocket(DISCOVERY_PORT)) {
+                         new DatagramSocket(Configuracion.PUERTO_DESCUBRIMIENTO)) {
 
                 socket.setBroadcast(true);
 
@@ -162,7 +161,7 @@ public class Discovery {
                                         requestData,
                                         requestData.length,
                                         broadcast,
-                                        DISCOVERY_PORT
+                                        Configuracion.PUERTO_DESCUBRIMIENTO
                                 );
 
                         try {
@@ -185,7 +184,7 @@ public class Discovery {
                                     InetAddress.getByName(
                                             "127.0.0.1"
                                     ),
-                                    DISCOVERY_PORT
+                                    Configuracion.PUERTO_DESCUBRIMIENTO
                             );
 
                     socket.send(localhostPacket);

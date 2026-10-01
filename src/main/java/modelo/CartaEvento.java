@@ -1,4 +1,5 @@
 package modelo;
+import config.Configuracion;
 
 /**
  * Carta de los mazos de Arca Comunal y Suerte.
@@ -41,7 +42,6 @@ public class CartaEvento {
     // Ids fijos de casillas del Tablero que usan las cartas de IR_A_CASILLA.
     // Si se cambia el orden del Tablero, hay que actualizar estos números.
     private static final int SALIDA = 0;
-    private static final int CARCEL = 10;
     private static final int MONTEVERDE = 24;
     private static final int SANTA_ANA = 39;
 
@@ -98,7 +98,7 @@ public class CartaEvento {
             new CartaEvento(5, arca, "Salga de la cárcel gratis.",
                     Accion.SALIR_DE_CARCEL, 0),
             new CartaEvento(6, arca, "Vaya directo a la cárcel. No pase por Salida ni cobre ₡200.",
-                    Accion.IR_A_CARCEL, CARCEL),
+                    Accion.IR_A_CARCEL, Configuracion.POSICION_CARCEL),
             new CartaEvento(7, arca, "Vence su fondo de vacaciones. Cobre ₡100.",
                     Accion.COBRAR_BANCO, 100),
             new CartaEvento(8, arca, "Es su cumpleaños. Cobre ₡10 de cada jugador.",
@@ -134,7 +134,7 @@ public class CartaEvento {
             new CartaEvento(17, suerte, "Retroceda 3 casillas.",
                     Accion.RETROCEDER, 3),
             new CartaEvento(18, suerte, "Vaya directo a la cárcel. No pase por Salida ni cobre ₡200.",
-                    Accion.IR_A_CARCEL, CARCEL),
+                    Accion.IR_A_CARCEL, Configuracion.POSICION_CARCEL),
             new CartaEvento(19, suerte, "Reparaciones generales a sus propiedades: pague ₡25 por casa y ₡100 por hotel.",
                     Accion.REPARACIONES, 25, 100),
             new CartaEvento(20, suerte, "Lo eligieron presidente de la junta directiva. Pague ₡50 a cada jugador.",

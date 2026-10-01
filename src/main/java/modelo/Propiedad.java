@@ -1,4 +1,5 @@
 package modelo;
+import config.Configuracion;
 
 /**
  * Casilla que se puede comprar, administrar casas/hoteles e hipotecar.
@@ -82,7 +83,7 @@ public class Propiedad extends Casilla {
     void registrarMovimiento(int pasos) {
         if (propietario == null || vueltaDesdeCompraCompletada) return;
         recorridoDesdeCompra += pasos;
-        int longitudVuelta = tablero == null ? 40 : tablero.tamaño();
+        int longitudVuelta = tablero == null ? Configuracion.CASILLAS_TABLERO : tablero.tamaño();
         if (recorridoDesdeCompra >= longitudVuelta) vueltaDesdeCompraCompletada = true;
     }
 
@@ -137,9 +138,9 @@ public class Propiedad extends Casilla {
         if (jugador == null || propietario != jugador) return "La propiedad no pertenece al jugador en turno.";
         if (!esEdificable()) return "No se construyen casas en transportes ni servicios.";
         if (hipotecada) return "La propiedad está hipotecada.";
-        if (tieneHotel || casas >= 4) return "La propiedad ya tiene el máximo de casas o un hotel.";
+        if (tieneHotel || casas >= Configuracion.MAX_CASAS_POR_PROPIEDAD) return "La propiedad ya tiene el máximo de casas o un hotel.";
         if (!vueltaDesdeCompraCompletada) {
-            int longitudVuelta = tablero == null ? 40 : tablero.tamaño();
+            int longitudVuelta = tablero == null ? Configuracion.CASILLAS_TABLERO : tablero.tamaño();
             return "Debes completar una vuelta desde la compra de " + getNombre()
                     + ". Te faltan " + (longitudVuelta - recorridoDesdeCompra) + " casillas de recorrido.";
         }
@@ -156,7 +157,7 @@ public class Propiedad extends Casilla {
     }
 
     public boolean agregarCasa() {
-        if (esEdificable() && !hipotecada && casas < 4 && !tieneHotel) {
+        if (esEdificable() && !hipotecada && casas < Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
             casas++;
             return true;
         }
@@ -180,7 +181,7 @@ public class Propiedad extends Casilla {
     }
 
     public boolean construirHotel() {
-        if (esEdificable() && !hipotecada && casas == 4 && !tieneHotel) {
+        if (esEdificable() && !hipotecada && casas == Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
             casas = 0;
             tieneHotel = true;
             return true;
@@ -191,7 +192,7 @@ public class Propiedad extends Casilla {
     public boolean quitarHotel() {
         if (tieneHotel) {
             tieneHotel = false;
-            casas = 4;
+            casas = Configuracion.MAX_CASAS_POR_PROPIEDAD;
             return true;
         }
         return false;

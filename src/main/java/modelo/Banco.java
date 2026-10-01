@@ -1,4 +1,5 @@
 package modelo;
+import config.Configuracion;
 /**
  * Clase Banco
  *
@@ -60,15 +61,13 @@ public class Banco {
     /**
      * Crea un banco con los valores iniciales del juego.
      *
-     * Dinero: ₡1.000.000
-     * Casas: 32
-     * Hoteles: 12
+     * Los valores (dinero, casas y hoteles) están en Configuracion.
      */
     public Banco() {
 
-        this.saldo = 1_000_000;
-        this.casasDisponibles = 32;
-        this.hotelesDisponibles = 12;
+        this.saldo = Configuracion.SALDO_BANCO;
+        this.casasDisponibles = Configuracion.CASAS_BANCO;
+        this.hotelesDisponibles = Configuracion.HOTELES_BANCO;
     }
 
 
@@ -593,7 +592,7 @@ public class Banco {
          * Las cuatro casas que tenía la propiedad
          * regresan al banco.
          */
-        casasDisponibles += 4;
+        casasDisponibles += Configuracion.MAX_CASAS_POR_PROPIEDAD;
 
         registrar(jugador, TipoTransaccion.COMPRA_HOTEL, propiedad.getNombre(), saldoAnterior);
 
@@ -612,7 +611,7 @@ public class Banco {
         if (!propiedad.esEdificable()) return "No se construyen hoteles en transportes ni servicios.";
         if (propiedad.estaHipotecada()) return "La propiedad está hipotecada.";
         if (propiedad.tieneHotel()) return "La propiedad ya tiene un hotel.";
-        if (propiedad.getCantidadCasas() != 4) return "Necesitas cuatro casas en esta propiedad para comprar un hotel.";
+        if (propiedad.getCantidadCasas() != Configuracion.MAX_CASAS_POR_PROPIEDAD) return "Necesitas cuatro casas en esta propiedad para comprar un hotel.";
         if (hotelesDisponibles <= 0) return "El banco no tiene hoteles disponibles.";
         if (jugador.getSaldo() < propiedad.getPrecioHotel()) return "Saldo insuficiente para comprar un hotel.";
         return null;
@@ -803,9 +802,9 @@ public class Banco {
             return false;
         }
 
-        // 10% de interés.
+        // Interés sobre el valor de la hipoteca (10% en el juego original).
         int interes =
-                valorHipoteca / 10;
+                valorHipoteca * Configuracion.INTERES_HIPOTECA_PORCENTAJE / 100;
 
         int montoTotal =
                 valorHipoteca + interes;

@@ -1,5 +1,6 @@
 package cliente;
 
+import config.Configuracion;
 import modelo.Casilla;
 import modelo.CasillaEspecial;
 import modelo.CasillaEvento;
@@ -73,8 +74,6 @@ public class VentanaTablero extends JFrame {
     private boolean finMostrado = false;
 
     // --- Animación de los dados ---
-    private static final int DURACION_ANIMACION_MS = 1200; // cuánto giran antes de mostrar el número final
-    private static final int INTERVALO_ANIMACION_MS = 80;  // cada cuánto cambia la cara mientras gira
     private final Random random = new Random();
     private Timer temporizadorDados;                // != null mientras los dados están girando
     private Message.EstadoJuego estadoPendiente;    // estado que llegó mientras giraban
@@ -264,7 +263,7 @@ public class VentanaTablero extends JFrame {
 
     /**
      * Hace girar los dados en el tablero (caras al azar, solo visuales)
-     * durante DURACION_ANIMACION_MS y los deja quietos en los valores
+     * durante Configuracion.DURACION_DADOS_MS y los deja quietos en los valores
      * REALES, los que tiró el cajero y el servidor ya usó para mover.
      *
      * Usa javax.swing.Timer (no java.util.Timer): sus eventos se disparan
@@ -278,11 +277,11 @@ public class VentanaTablero extends JFrame {
 
         long inicioAnimacion = System.currentTimeMillis();
 
-        temporizadorDados = new Timer(INTERVALO_ANIMACION_MS, null);
+        temporizadorDados = new Timer(Configuracion.INTERVALO_DADOS_MS, null);
         temporizadorDados.addActionListener(evento -> {
             long transcurrido = System.currentTimeMillis() - inicioAnimacion;
 
-            if (transcurrido >= DURACION_ANIMACION_MS) {
+            if (transcurrido >= Configuracion.DURACION_DADOS_MS) {
                 temporizadorDados.stop();
                 temporizadorDados = null;
                 panelTablero.mostrarDados(dadoFinal1, dadoFinal2); // números del cajero, ya no al azar
