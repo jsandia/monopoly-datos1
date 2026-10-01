@@ -30,7 +30,7 @@ public final class Configuracion {
     public static final int CANTIDAD_JUGADORES = 4;
 
     /** Al pasar este número de turnos la partida termina. */
-    public static final int MAX_TURNOS = 10;
+    public static final int MAX_TURNOS = 100;
 
     // =========================================================
     // DINERO (montos del Monopoly original)
