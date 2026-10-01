@@ -948,18 +948,28 @@ public class GameServer {
         // Juego aplica todas las reglas: cárcel, movimiento, Salida,
         // cartas de Suerte / Arca Comunal y "Vaya a la cárcel".
         // Devuelve qué pasó, una línea por evento.
+        Jugador quienTiro = juego.getJugadorActual();
+        int indiceQuienTiro = indiceEnTurno();
+
         String resultado = juego.jugarTiro(dado1, dado2);
 
         yaTiro = true;
 
         // Primero los dados, para que los clientes los animen...
         difundir(new Message.Dados(
-                indiceEnTurno(),
+                indiceQuienTiro,
                 dado1,
                 dado2
         ));
 
         difundir(new Message.Aviso(resultado));
+
+        if (juego.esFinDeJuego()) {
+            difundir(new Message.Aviso(textoFinDePartida()));
+        } else if (!quienTiro.isActivo()) {
+            // Quebró en su propio tiro: no tiene nada más que hacer en este turno
+            pasarTurno();
+        }
 
         // ...y después cómo quedó todo
         difundir(crearEstado());
@@ -1166,32 +1176,50 @@ public class GameServer {
                 return;
             }
 
-            juego.terminarTurnoActual();
-
-            jugadorPendientePago = null;
-            propiedadPendientePago = null;
-            computadoraPendientePago = -1;
-            tipoCompraPendiente = TipoCompra.PROPIEDAD;
-
-            yaTiro = false;
-
-            if (juego.esFinDeJuego()) {
-
-                difundir(new Message.Aviso(
-                        "¡La partida ha finalizado!"
-                ));
-
-            } else {
-
-                difundir(new Message.Aviso(
-                        "Turno de "
-                                + juego.getJugadorActual().getNombre()
-                                + ". Tirá los dados en el cajero."
-                ));
-            }
+            pasarTurno();
 
             difundir(crearEstado());
         }
+    }
+
+    // Pasa al siguiente jugador y avisa a todos. No manda el estado: eso lo
+    // hace quien llama, al final. Hay que llamarlo teniendo gameLock.
+    private void pasarTurno() {
+
+        String avisos = juego.terminarTurnoActual();
+
+        // Una compra esperando tarjeta no sobrevive al cambio de turno
+        jugadorPendientePago = null;
+        propiedadPendientePago = null;
+        computadoraPendientePago = -1;
+        tipoCompraPendiente = TipoCompra.PROPIEDAD;
+
+        yaTiro = false;
+
+        if (!avisos.isEmpty()) {
+            difundir(new Message.Aviso(avisos));
+        }
+
+        if (juego.esFinDeJuego()) {
+            difundir(new Message.Aviso(textoFinDePartida()));
+        } else {
+            difundir(new Message.Aviso(
+                    "Turno de "
+                            + juego.getJugadorActual().getNombre()
+                            + ". Tirá los dados en el cajero."
+            ));
+        }
+    }
+
+    // "¡Ganó X con ₡N!" para el registro de partida de los clientes
+    private String textoFinDePartida() {
+        Jugador ganador = juego.getGanador();
+        if (ganador == null) {
+            return "🏁 ¡La partida ha finalizado!";
+        }
+        return "🏆 ¡La partida ha finalizado! Gana " + ganador.getNombre()
+                + " con un patrimonio de ₡" + ganador.calcularPatrimonio()
+                + (juego.hayEmpate() ? " (empate en patrimonio: gana quien va primero en el turno)." : ".");
     }
 
 
@@ -1287,6 +1315,9 @@ public class GameServer {
         int[] posiciones = new int[Configuracion.CANTIDAD_JUGADORES];
         boolean[] enCarcel = new boolean[Configuracion.CANTIDAD_JUGADORES];
         int[] cartasCarcel = new int[Configuracion.CANTIDAD_JUGADORES];
+        boolean[] activos = new boolean[Configuracion.CANTIDAD_JUGADORES];
+        int[] patrimonios = new int[Configuracion.CANTIDAD_JUGADORES];
+        int ganador = -1;
 
         for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
 
@@ -1295,15 +1326,21 @@ public class GameServer {
             posiciones[i] = jugadores[i].getPosicionActual();
             enCarcel[i] = jugadores[i].isEnCarcel();
             cartasCarcel[i] = jugadores[i].getCantidadCartasSalirCarcel();
+            activos[i] = jugadores[i].isActivo();
+            patrimonios[i] = jugadores[i].calcularPatrimonio();
+            if (jugadores[i] == juego.getGanador()) ganador = i;
         }
 
+        Jugador actual = juego.getJugadorActual();
         Casilla casillaActual =
                 tablero.obtenerCasilla(
-                        juego.getJugadorActual().getPosicionActual()
+                        actual.getPosicionActual()
                 );
 
         boolean puedeComprar =
                 yaTiro
+                        && actual.isActivo()
+                        && !juego.esFinDeJuego()
                         && casillaActual instanceof Propiedad propiedad
                         && !propiedad.tienePropietario();
 
@@ -1336,7 +1373,11 @@ public class GameServer {
                 cartasCarcel,
                 propiedades,
                 juego.getBanco().getCasasDisponibles(),
-                juego.getBanco().getHotelesDisponibles()
+                juego.getBanco().getHotelesDisponibles(),
+                activos,
+                patrimonios,
+                ganador,
+                juego.hayEmpate()
         );
     }
 

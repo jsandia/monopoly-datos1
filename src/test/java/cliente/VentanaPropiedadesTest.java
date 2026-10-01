@@ -12,7 +12,8 @@ class VentanaPropiedadesTest {
     private static Message.EstadoJuego estado(Message.EstadoPropiedad[] propiedades) {
         return new Message.EstadoJuego(1, 100, 0, new String[]{"Ana", "José", "Luis", "María"},
                 new int[]{1500, 1500, 1500, 1500}, new int[4], new int[]{0, 0, 1, 1},
-                false, false, false, new boolean[4], new int[4], propiedades, 32, 12);
+                false, false, false, new boolean[4], new int[4], propiedades, 32, 12,
+                new boolean[]{true, true, true, true}, new int[4], -1, false);
     }
 
     private static <T extends Component> T buscar(Component componente, Class<T> tipo) {

@@ -141,7 +141,10 @@ public sealed interface Message extends Serializable
      * jugador (0 a 3). computadoras[i] dice desde qué computadora se juega
      * el jugador i, para que cada cliente sepa si el turno es suyo.
      * enCarcel[i] dice si el jugador i está preso y cartasCarcel[i] cuántas
-     * cartas "Salga de la cárcel" tiene guardadas.
+     * cartas "Salga de la cárcel" tiene guardadas. activos[i] es false si
+     * quedó en bancarrota, y patrimonios[i] es su saldo + valor de propiedades.
+     * Al terminar, ganador es el índice del ganador (-1 mientras se juega) y
+     * empate dice si ganó por desempate.
      */
     record EstadoJuego(
             int turnoGlobal,
@@ -158,6 +161,10 @@ public sealed interface Message extends Serializable
             int[] cartasCarcel,
             EstadoPropiedad[] propiedades,
             int casasDisponibles,
-            int hotelesDisponibles
+            int hotelesDisponibles,
+            boolean[] activos,
+            int[] patrimonios,
+            int ganador,
+            boolean empate
     ) implements Message {}
 }

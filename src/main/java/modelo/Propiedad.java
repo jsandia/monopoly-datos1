@@ -198,6 +198,18 @@ public class Propiedad extends Casilla {
         return false;
     }
 
+    /**
+     * Deja la propiedad como al inicio de la partida: sin dueño, sin casas,
+     * sin hotel y sin hipoteca. Se usa cuando su dueño queda en bancarrota.
+     * Las casas y el hotel los recupera el Banco antes de llamar a esto.
+     */
+    void devolverAlBanco() {
+        setPropietario(null);
+        casas = 0;
+        tieneHotel = false;
+        hipotecada = false;
+    }
+
     // --- HIPOTECA ---
     public boolean estaHipotecada() {
         return hipotecada;

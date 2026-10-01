@@ -77,6 +77,8 @@ public class PanelTablero extends JPanel {
     // Casilla donde el servidor dice que está cada jugador
     private final int[] posicionDestino = new int[Configuracion.CANTIDAD_JUGADORES];
     private final String[] nombresJugadores = {"1", "2", "3", "4"};
+    // false = quedó en bancarrota: su ficha ya no se dibuja
+    private final boolean[] fichaEnJuego = {true, true, true, true};
     private int jugadorEnTurno = -1;
     private Timer temporizadorFichas; // != null mientras alguna ficha está caminando
 
@@ -124,8 +126,9 @@ public class PanelTablero extends JPanel {
      * está lejos de su destino, camina casilla por casilla (como en el juego
      * real) con un Timer. La primera vez, o si el salto es mayor que lo que
      * pueden avanzar los dados (ir a la cárcel, cartas...), aparece directo.
+     * Las fichas de los jugadores eliminados dejan de dibujarse.
      */
-    public void actualizarFichas(int[] posiciones, String[] nombres, int enTurno) {
+    public void actualizarFichas(int[] posiciones, String[] nombres, int enTurno, boolean[] activos) {
         jugadorEnTurno = enTurno;
 
         for (int i = 0; i < Configuracion.CANTIDAD_JUGADORES; i++) {
@@ -134,8 +137,9 @@ public class PanelTablero extends JPanel {
             }
 
             posicionDestino[i] = posiciones[i];
+            fichaEnJuego[i] = activos[i];
 
-            if (posicionVisible[i] < 0) {
+            if (posicionVisible[i] < 0 || !fichaEnJuego[i]) {
                 posicionVisible[i] = posiciones[i]; // primera vez: sin animación
             } else {
                 int pasos = Math.floorMod(posicionDestino[i] - posicionVisible[i], 40);
@@ -228,7 +232,7 @@ public class PanelTablero extends JPanel {
             int[] aqui = new int[Configuracion.CANTIDAD_JUGADORES];
             int cantidad = 0;
             for (int j = 0; j < Configuracion.CANTIDAD_JUGADORES; j++) {
-                if (posicionVisible[j] == casilla) aqui[cantidad++] = j;
+                if (fichaEnJuego[j] && posicionVisible[j] == casilla) aqui[cantidad++] = j;
             }
             if (cantidad == 0) continue;
 

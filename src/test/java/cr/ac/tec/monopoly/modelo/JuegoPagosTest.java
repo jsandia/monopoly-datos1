@@ -82,32 +82,6 @@ class JuegoPagosTest {
     }
 
     @Test
-    void pagosInasequiblesNoCambianSaldosNiGeneranTransacciones() {
-        ana.setSaldo(10);
-        Propiedad aeropuerto = (Propiedad) juego.getTablero().obtenerCasilla(5);
-        assertTrue(juego.getBanco().comprarPropiedad(jose, aeropuerto));
-        ana.setPosicionActual(2);
-
-        String resultadoAlquiler = juego.jugarTiro(1, 2);
-
-        assertEquals(10, ana.getSaldo());
-        assertEquals(1300, jose.getSaldo());
-        assertTrue(resultadoAlquiler.contains("no tiene suficiente saldo"));
-        assertEquals(0, juego.getRegistroTransacciones().getHistorial()
-                .buscarPorTipo(TipoTransaccion.PAGO_ALQUILER).length);
-
-        juego.terminarTurnoActual();
-        juego.terminarTurnoActual();
-        ana.setSaldo(150);
-        ana.setPosicionActual(1);
-        juego.jugarTiro(1, 2);
-
-        assertEquals(150, ana.getSaldo());
-        assertEquals(0, juego.getRegistroTransacciones().getHistorial()
-                .buscarPorTipo(TipoTransaccion.PAGO_AL_BANCO).length);
-    }
-
-    @Test
     void cartaQueMueveAPropiedadResuelveSuAlquiler() {
         Propiedad puertoCaldera = (Propiedad) juego.getTablero().obtenerCasilla(15);
         assertTrue(juego.getBanco().comprarPropiedad(jose, puertoCaldera));

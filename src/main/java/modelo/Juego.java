@@ -22,6 +22,10 @@ public class Juego {
     private int turnoActualGlobal;
     private boolean terminado;
 
+    // Se calculan al terminar la partida
+    private Jugador ganador;
+    private boolean hayEmpate;
+
     // Componentes e infraestructuras de la partida
 
     // Turnos: el del frente es el que juega. Pasar el turno es sacarlo del
@@ -154,18 +158,18 @@ public class Juego {
             return false;
         }
 
-        // Tercer intento fallido: paga la multa a la fuerza y sale
-        if (banco.cobrarMultaCarcel(jugador, Configuracion.MULTA_CARCEL)) {
-            jugador.liberarDeCarcel();
-            log.append("\nTercer intento sin dobles: paga la multa de ₡").append(Configuracion.MULTA_CARCEL)
-                    .append(" y sale de la cárcel.");
-            return true;
+        // Tercer intento fallido: la multa es obligatoria
+        if (jugador.getSaldo() < Configuracion.MULTA_CARCEL) {
+            log.append("\nTercer intento sin dobles.");
+            declararBancarrota(jugador, null, TipoTransaccion.PAGO_AL_BANCO,
+                    "Multa para salir de la cárcel", Configuracion.MULTA_CARCEL, log);
+            return false;
         }
-
-        // Todavia no hay bancarrota: si no le alcanza, se queda preso
-        log.append("\nTercer intento sin dobles, pero no le alcanza para la multa de ₡")
-                .append(Configuracion.MULTA_CARCEL).append(". Sigue en la cárcel.");
-        return false;
+        banco.cobrarMultaCarcel(jugador, Configuracion.MULTA_CARCEL);
+        jugador.liberarDeCarcel();
+        log.append("\nTercer intento sin dobles: paga la multa de ₡").append(Configuracion.MULTA_CARCEL)
+                .append(" y sale de la cárcel.");
+        return true;
     }
 
     /**
@@ -262,26 +266,23 @@ public class Juego {
             }
 
             int alquiler = propiedad.calcularAlquiler();
-            if (banco.cobrarAlquiler(jugador, propiedad)) {
+            if (jugador.getSaldo() < alquiler) {
+                declararBancarrota(jugador, propietario, TipoTransaccion.PAGO_ALQUILER,
+                        "Alquiler de " + propiedad.getNombre(), alquiler, log);
+            } else if (banco.cobrarAlquiler(jugador, propiedad)) {
                 log.append("\n").append(jugador.getNombre()).append(" paga ₡")
                         .append(alquiler).append(" de alquiler a ")
                         .append(propietario.getNombre()).append(" por ")
                         .append(propiedad.getNombre()).append(".");
-            } else if (jugador.getSaldo() < alquiler) {
-                log.append("\n").append(jugador.getNombre())
-                        .append(" no tiene suficiente saldo para pagar ₡")
-                        .append(alquiler).append(" de alquiler a ")
-                        .append(propietario.getNombre()).append(".");
             }
         } else if (casilla instanceof CasillaEspecial especial
                 && especial.getTipo() == CasillaEspecial.Tipo.IMPUESTO) {
-            if (banco.cobrarImpuesto(jugador, especial.getMonto())) {
+            if (jugador.getSaldo() < especial.getMonto()) {
+                declararBancarrota(jugador, null, TipoTransaccion.PAGO_AL_BANCO,
+                        "Pago de impuesto", especial.getMonto(), log);
+            } else if (banco.cobrarImpuesto(jugador, especial.getMonto())) {
                 log.append("\n").append(jugador.getNombre()).append(" paga ₡")
                         .append(especial.getMonto()).append(" de impuesto al banco.");
-            } else {
-                log.append("\n").append(jugador.getNombre())
-                        .append(" no tiene suficiente saldo para pagar el impuesto de ₡")
-                        .append(especial.getMonto()).append(".");
             }
         } else if (casilla instanceof CasillaEspecial especial
                 && especial.getTipo() == CasillaEspecial.Tipo.IR_A_CARCEL) {
@@ -338,16 +339,21 @@ public class Juego {
             case COBRAR_BANCO -> banco.pagarGananciaEvento(jugador, valor, texto);
 
             case PAGAR_BANCO -> {
-                if (!banco.cobrarPerdidaEvento(jugador, valor, texto)) {
-                    log.append("\nNo le alcanza para pagar ₡").append(valor).append(".");
+                if (jugador.getSaldo() < valor) {
+                    declararBancarrota(jugador, null, TipoTransaccion.PERDIDA_EVENTO, texto, valor, log);
+                } else {
+                    banco.cobrarPerdidaEvento(jugador, valor, texto);
                 }
             }
 
             case COBRAR_A_CADA_JUGADOR -> {
+                // Aqui el que puede quebrar es otro jugador, fuera de su turno
                 for (Jugador otro : jugadoresEnOrdenDeTurno()) {
                     if (otro == jugador || !otro.isActivo()) continue;
-                    if (!banco.pagarEntreJugadores(otro, jugador, valor, texto)) {
-                        log.append("\n").append(otro.getNombre()).append(" no tiene para pagar ₡").append(valor).append(".");
+                    if (otro.getSaldo() < valor) {
+                        declararBancarrota(otro, jugador, TipoTransaccion.PAGO_ENTRE_JUGADORES, texto, valor, log);
+                    } else {
+                        banco.pagarEntreJugadores(otro, jugador, valor, texto);
                     }
                 }
             }
@@ -355,10 +361,12 @@ public class Juego {
             case PAGAR_A_CADA_JUGADOR -> {
                 for (Jugador otro : jugadoresEnOrdenDeTurno()) {
                     if (otro == jugador || !otro.isActivo()) continue;
-                    if (!banco.pagarEntreJugadores(jugador, otro, valor, texto)) {
-                        log.append("\nNo le alcanza para pagarle ₡").append(valor)
-                                .append(" a ").append(otro.getNombre()).append(".");
+                    if (jugador.getSaldo() < valor) {
+                        // Le paga lo que le quede a este, y los demas ya no reciben nada
+                        declararBancarrota(jugador, otro, TipoTransaccion.PAGO_ENTRE_JUGADORES, texto, valor, log);
+                        break;
                     }
+                    banco.pagarEntreJugadores(jugador, otro, valor, texto);
                 }
             }
 
@@ -407,11 +415,17 @@ public class Juego {
                         + jugador.contarHoteles() * carta.getValorPorHotel();
                 if (monto == 0) {
                     log.append("\nNo tiene casas ni hoteles: no paga nada.");
-                } else if (banco.cobrarPerdidaEvento(jugador, monto, texto)) {
-                    log.append("\nPaga ₡").append(monto).append(" en reparaciones.");
+                } else if (jugador.getSaldo() < monto) {
+                    declararBancarrota(jugador, null, TipoTransaccion.PERDIDA_EVENTO, texto, monto, log);
                 } else {
-                    log.append("\nNo le alcanza para pagar ₡").append(monto).append(" de reparaciones.");
+                    banco.cobrarPerdidaEvento(jugador, monto, texto);
+                    log.append("\nPaga ₡").append(monto).append(" en reparaciones.");
                 }
+            }
+
+            case PERDER_TURNO -> {
+                jugador.perderProximoTurno();
+                log.append("\n").append(jugador.getNombre()).append(" pierde su próximo turno.");
             }
         }
         return false;
@@ -426,35 +440,146 @@ public class Juego {
     // =========================================================
 
     /**
-     * Termina el turno: el jugador del frente sale de la cola y vuelve a
-     * entrar al final. Asi el siguiente queda al frente.
+     * Termina el turno: el jugador del frente sale de la cola y, si sigue
+     * activo, vuelve a entrar al final. Asi el siguiente queda al frente.
      *
      * <pre>
      *   antes:   frente → [Ana, Beto, Caro, Dani]
      *   despues: frente → [Beto, Caro, Dani, Ana]
+     *
+     *   si Ana quebro en su turno, simplemente no se vuelve a encolar:
+     *   despues: frente → [Beto, Caro, Dani]
      * </pre>
      *
-     * Si el nuevo frente esta inactivo, se rota otra vez (como maximo una
-     * vuelta, para no ciclar si nadie esta activo).
+     * Si al que le toca tiene un turno por perder, lo gasta y se pasa al
+     * siguiente. Un turno perdido no suma al contador global.
+     *
+     * @return los avisos del cambio de turno (por ejemplo, quien perdio su
+     *         turno); vacio si no hubo nada especial
      */
-    public synchronized void terminarTurnoActual() {
-        pasarAlSiguiente();
-        for (int i = 1; i < turnos.tamaño() && !turnos.verFrente().isActivo(); i++) {
-            pasarAlSiguiente();
+    public synchronized String terminarTurnoActual() {
+        if (terminado) return "";
+        StringBuilder log = new StringBuilder();
+
+        Jugador saliente = turnos.desencolar();
+        if (saliente.isActivo()) {
+            turnos.encolar(saliente);
         }
+
         this.turnoActualGlobal++;
         registro.setTurno(turnoActualGlobal);
-
-        // Verifica si la partida debe terminar por limite de turnos o bancarrota general
-        if (this.turnoActualGlobal > this.maxTurnos || contarJugadoresActivos() <= 1) {
-            if (!this.terminado) registro.escribir("FIN DE PARTIDA | Turno " + turnoActualGlobal);
-            this.terminado = true;
+        if (turnoActualGlobal > maxTurnos) {
+            terminarPartida();
+            return log.toString();
         }
+
+        // Cada jugador gasta como mucho un turno perdido por vuelta, asi que el ciclo termina
+        while (turnos.verFrente().consumirTurnoPerdido()) {
+            if (log.length() > 0) log.append("\n");
+            log.append(turnos.verFrente().getNombre()).append(" pierde este turno.");
+            pasarAlSiguiente();
+        }
+        return log.toString();
     }
 
     // Desencolar del frente y encolar al final: eso es pasar el turno
     private void pasarAlSiguiente() {
         turnos.encolar(turnos.desencolar());
+    }
+
+    /**
+     * Saca de la cola a un jugador que no esta al frente (quebro fuera de
+     * su turno). Se da una vuelta completa a la cola y se vuelven a encolar
+     * todos menos el. El orden de los demas no cambia.
+     */
+    private void sacarDeLaCola(Jugador eliminado) {
+        int cantidad = turnos.tamaño();
+        for (int i = 0; i < cantidad; i++) {
+            Jugador jugador = turnos.desencolar();
+            if (jugador != eliminado) {
+                turnos.encolar(jugador);
+            }
+        }
+    }
+
+    // =========================================================
+    // BANCARROTA Y FIN DE PARTIDA
+    // =========================================================
+
+    /**
+     * Un jugador no alcanza a cubrir un pago obligatorio:
+     * entrega lo que tiene, sus propiedades vuelven al banco y queda fuera.
+     *
+     * Si es el del turno, se queda al frente de la cola hasta que termine su
+     * turno (terminarTurnoActual no lo vuelve a encolar). Si no es el del
+     * turno, sale de la cola de una vez.
+     *
+     * @param acreedor a quien le debia (null = el banco)
+     * @param monto    lo que debia pagar, solo para el mensaje
+     */
+    private void declararBancarrota(Jugador deudor, Jugador acreedor, TipoTransaccion tipo,
+            String motivo, int monto, StringBuilder log) {
+        int entregado = banco.liquidarBancarrota(deudor, acreedor, tipo, motivo);
+        deudor.setActivo(false);
+        deudor.liberarDeCarcel();
+
+        // Sus cartas "Salga de la carcel" vuelven a su mazo
+        CartaEvento carta;
+        while ((carta = deudor.usarCartaSalirCarcel()) != null) {
+            mazoDe(carta.getMazo()).encolar(carta);
+        }
+
+        if (deudor != turnos.verFrente()) {
+            sacarDeLaCola(deudor);
+        }
+
+        String nombreAcreedor = (acreedor == null) ? "el banco" : acreedor.getNombre();
+        log.append("\n💀 ").append(deudor.getNombre()).append(" no puede pagar ₡").append(monto)
+                .append(" (").append(motivo).append(") y queda en BANCARROTA.")
+                .append(" Le entrega ₡").append(entregado).append(" a ").append(nombreAcreedor)
+                .append(" y sus propiedades vuelven al banco.");
+
+        if (contarJugadoresActivos() <= 1) {
+            terminarPartida();
+        }
+    }
+
+    /**
+     * Cierra la partida y elige ganador: el de mayor patrimonio entre los
+     * activos (si queda uno solo, es ese). En empate gana el primero en el
+     * orden de turnos y se marca hayEmpate.
+     */
+    private void terminarPartida() {
+        if (terminado) return;
+        terminado = true;
+
+        for (Jugador jugador : jugadoresEnOrdenDeTurno()) {
+            if (!jugador.isActivo()) continue;
+            if (ganador == null || jugador.calcularPatrimonio() > ganador.calcularPatrimonio()) {
+                ganador = jugador;
+                hayEmpate = false;
+            } else if (jugador.calcularPatrimonio() == ganador.calcularPatrimonio()) {
+                hayEmpate = true;
+            }
+        }
+
+        String linea = "FIN DE PARTIDA | Turno " + turnoActualGlobal;
+        if (ganador != null) {
+            linea += " | Ganador: " + ganador.getNombre()
+                    + " | Patrimonio: " + ganador.calcularPatrimonio()
+                    + (hayEmpate ? " | Empate en patrimonio" : "");
+        }
+        registro.escribir(linea);
+    }
+
+    /** @return el ganador, o null si la partida no ha terminado */
+    public synchronized Jugador getGanador() {
+        return ganador;
+    }
+
+    /** @return true si el ganador empato en patrimonio con otro jugador */
+    public synchronized boolean hayEmpate() {
+        return hayEmpate;
     }
 
     /**

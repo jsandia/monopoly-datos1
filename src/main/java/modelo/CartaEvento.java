@@ -36,7 +36,9 @@ public class CartaEvento {
         /** Sale de la cárcel gratis. "valor" no se usa. */
         SALIR_DE_CARCEL,
         /** Paga "valor" por cada casa y "valorPorHotel" por cada hotel que tenga. */
-        REPARACIONES
+        REPARACIONES,
+        /** El jugador no juega su próximo turno. "valor" no se usa. */
+        PERDER_TURNO
     }
 
     // Ids fijos de casillas del Tablero que usan las cartas de IR_A_CASILLA.
@@ -93,8 +95,8 @@ public class CartaEvento {
                     Accion.COBRAR_BANCO, 200),
             new CartaEvento(3, arca, "Honorarios del médico. Pague ₡50.",
                     Accion.PAGAR_BANCO, 50),
-            new CartaEvento(4, arca, "Por la venta de acciones usted gana ₡50.",
-                    Accion.COBRAR_BANCO, 50),
+            new CartaEvento(4, arca, "Se le olvidó la cédula en la casa. Pierda su próximo turno.",
+                    Accion.PERDER_TURNO, 0),
             new CartaEvento(5, arca, "Salga de la cárcel gratis.",
                     Accion.SALIR_DE_CARCEL, 0),
             new CartaEvento(6, arca, "Vaya directo a la cárcel. No pase por Salida ni cobre ₡200.",
@@ -127,8 +129,8 @@ public class CartaEvento {
                     Accion.IR_A_CASILLA, SANTA_ANA),
             new CartaEvento(14, suerte, "Avance hasta el transporte más cercano. Si pasa por Salida, cobre ₡200.",
                     Accion.IR_AL_TRANSPORTE_MAS_CERCANO, 0),
-            new CartaEvento(15, suerte, "El banco le paga un dividendo de ₡50.",
-                    Accion.COBRAR_BANCO, 50),
+            new CartaEvento(15, suerte, "Presa en la General Cañas. Pierda su próximo turno.",
+                    Accion.PERDER_TURNO, 0),
             new CartaEvento(16, suerte, "Salga de la cárcel gratis.",
                     Accion.SALIR_DE_CARCEL, 0),
             new CartaEvento(17, suerte, "Retroceda 3 casillas.",

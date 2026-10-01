@@ -323,8 +323,16 @@ public class VentanaTablero extends JFrame {
         // Los 4 jugadores. JLabel acepta un poquito de HTML para poner varias líneas.
         StringBuilder lista = new StringBuilder("<html>");
         for (int i = 0; i < estado.nombres().length; i++) {
-            lista.append(i == enTurno ? "▶ " : "&nbsp;&nbsp;&nbsp;")
-                    .append(estado.nombres()[i])
+            if (i == estado.ganador()) {
+                lista.append("🏆 ");
+            } else {
+                lista.append(i == enTurno && !estado.terminado() ? "▶ " : "&nbsp;&nbsp;&nbsp;");
+            }
+            if (!estado.activos()[i]) {
+                lista.append("<s>").append(estado.nombres()[i]).append("</s> — 💀 eliminado<br>");
+                continue;
+            }
+            lista.append(estado.nombres()[i])
                     .append(" — ₡").append(estado.saldos()[i])
                     .append(" — casilla ").append(estado.posiciones()[i])
                     .append(estado.enCarcel()[i] ? " — 🔒 preso" : "")
@@ -333,7 +341,9 @@ public class VentanaTablero extends JFrame {
         etiquetaJugadores.setText(lista.append("</html>").toString());
 
         if (estado.terminado()) {
-            etiquetaIndicacion.setText("Partida terminada");
+            etiquetaIndicacion.setText(estado.ganador() >= 0
+                    ? "Partida terminada: gana " + estado.nombres()[estado.ganador()]
+                    : "Partida terminada");
         } else if (!estado.yaTiro()) {
             panelTablero.ocultarDados(); // turno nuevo: todavía no hay dados
             if (estado.enCarcel()[enTurno]) {
@@ -375,14 +385,33 @@ public class VentanaTablero extends JFrame {
         // Como aplicarEstado se llama cuando terminan de girar los dados, las
         // fichas se mueven justo después de ver el resultado.
         panelTablero.actualizarFichas(estado.posiciones(), estado.nombres(),
-                estado.terminado() ? -1 : enTurno);
+                estado.terminado() ? -1 : enTurno, estado.activos());
 
         panelTablero.repaint();
 
         if (estado.terminado() && !finMostrado) {
             finMostrado = true;
-            JOptionPane.showMessageDialog(this, "¡La partida ha finalizado!", "Fin de Juego", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, textoFinal(estado), "Fin de Juego", JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    /** Ganador y patrimonio de cada jugador (saldo + valor de sus propiedades). */
+    private static String textoFinal(Message.EstadoJuego estado) {
+        StringBuilder texto = new StringBuilder("¡La partida ha finalizado!\n\n");
+        if (estado.ganador() >= 0) {
+            texto.append("🏆 Gana ").append(estado.nombres()[estado.ganador()]);
+            if (estado.empate()) {
+                texto.append(" (empate en patrimonio: gana quien va primero en el turno)");
+            }
+            texto.append("\n\n");
+        }
+        texto.append("Patrimonio final:\n");
+        for (int i = 0; i < estado.nombres().length; i++) {
+            texto.append("  ").append(estado.nombres()[i]).append(": ");
+            texto.append(estado.activos()[i] ? "₡" + estado.patrimonios()[i] : "eliminado");
+            texto.append("\n");
+        }
+        return texto.toString();
     }
 
     private void configurarEventosBotones() {

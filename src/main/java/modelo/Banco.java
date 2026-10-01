@@ -833,6 +833,54 @@ public class Banco {
 
 
     // =========================================================
+    // BANCARROTA
+    // =========================================================
+
+    /**
+     * El deudor no alcanza a cubrir un pago obligatorio:
+     * 1. entrega todo el saldo que tenga al acreedor (null = el banco);
+     * 2. sus propiedades vuelven al banco sin dueño, y sus casas y hoteles
+     *    vuelven al inventario del banco.
+     *
+     * Marcarlo inactivo y sacarlo de los turnos le toca a Juego.
+     *
+     * @param tipo        tipo del pago que no pudo cubrir (alquiler, impuesto...)
+     * @param descripcion motivo del pago, para el historial
+     * @return cuanto dinero alcanzo a entregar
+     */
+    public synchronized int liquidarBancarrota(Jugador deudor, Jugador acreedor,
+            TipoTransaccion tipo, String descripcion) {
+        int entregado = deudor.getSaldo();
+        String detalle = descripcion + " (bancarrota)";
+
+        if (entregado > 0) {
+            deudor.debitar(entregado);
+            if (acreedor == null) {
+                recibirDinero(entregado);
+                registrar(deudor, tipo, detalle, entregado);
+            } else {
+                int anteriorAcreedor = acreedor.getSaldo();
+                acreedor.acreditar(entregado);
+                if (registro != null) {
+                    registro.registrar(tipo, deudor, acreedor, entregado, detalle,
+                            entregado, 0, anteriorAcreedor, acreedor.getSaldo());
+                }
+            }
+        }
+
+        for (Propiedad propiedad : deudor.entregarTodasLasPropiedades()) {
+            // Al comprar un hotel las 4 casas ya habian vuelto al banco:
+            // aqui solo regresa el hotel (o las casas sueltas que tenga)
+            if (propiedad.tieneHotel()) {
+                hotelesDisponibles++;
+            }
+            casasDisponibles += propiedad.getCantidadCasas();
+            propiedad.devolverAlBanco();
+        }
+        return entregado;
+    }
+
+    // =========================================================
     // PAGOS CON TARJETA RFID
     // =========================================================
 

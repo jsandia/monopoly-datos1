@@ -35,6 +35,9 @@ public class Jugador {
     // Se guarda la carta misma (no solo un contador) para devolverla a su mazo al usarla.
     private final CartaEvento[] cartasSalirCarcel = new CartaEvento[2];
 
+    // Turnos que le faltan por perder (carta "pierda su proximo turno")
+    private int turnosPorPerder;
+
     // Constructor principal del jugador
     public Jugador(String id, String nombre, int saldoInicial) {
         this.id = id;
@@ -167,6 +170,31 @@ public class Jugador {
     }
 
     // =========================================================
+    // TURNOS PERDIDOS
+    // =========================================================
+
+    // La carta "pierda su proximo turno" suma uno
+    public void perderProximoTurno() {
+        turnosPorPerder++;
+    }
+
+    /**
+     * Si tiene un turno por perder, lo gasta y devuelve true (el turno se
+     * salta). Si no, devuelve false y juega normal.
+     */
+    public boolean consumirTurnoPerdido() {
+        if (turnosPorPerder > 0) {
+            turnosPorPerder--;
+            return true;
+        }
+        return false;
+    }
+
+    public int getTurnosPorPerder() {
+        return turnosPorPerder;
+    }
+
+    // =========================================================
     // PROPIEDADES (ListaSimple<Propiedad>)
     // =========================================================
 
@@ -180,6 +208,22 @@ public class Jugador {
     // Quita una propiedad de su lista
     public void quitarPropiedad(Propiedad propiedad) {
         propiedades.eliminar(propiedad);
+    }
+
+    /**
+     * Entrega todas sus propiedades (por bancarrota) y deja su lista vacia.
+     * Primero se copian a un arreglo recorriendo los nodos, y despues se
+     * vacia la lista: asi quien las recibe no depende de los nodos borrados.
+     */
+    public Propiedad[] entregarTodasLasPropiedades() {
+        Propiedad[] entregadas = new Propiedad[propiedades.tamaño()];
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        for (int i = 0; actual != null; i++) {
+            entregadas[i] = actual.getDato();
+            actual = actual.getSiguiente();
+        }
+        propiedades.vaciar();
+        return entregadas;
     }
 
     // Suma el precio de compra de todas sus propiedades

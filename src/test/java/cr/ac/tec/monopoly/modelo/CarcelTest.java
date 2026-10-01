@@ -80,15 +80,16 @@ class CarcelTest {
     }
 
     @Test
-    void siNoLeAlcanzaParaLaMultaSigueEnLaCarcel() {
+    void siNoLeAlcanzaParaLaMultaObligatoriaQuedaEnBancarrota() {
         ana.setSaldo(10);
         ana.enviarACarcel(Configuracion.POSICION_CARCEL);
         juego.jugarTiro(1, 2);
         juego.jugarTiro(1, 2);
-        juego.jugarTiro(1, 2);
+        juego.jugarTiro(1, 2); // tercer intento: la multa es obligatoria y no le alcanza
 
-        assertTrue(ana.isEnCarcel());
-        assertEquals(10, ana.getSaldo());
+        assertFalse(ana.isActivo());
+        assertEquals(0, ana.getSaldo());
+        assertTrue(juego.esFinDeJuego()); // solo quedaba José
     }
 
     @Test
