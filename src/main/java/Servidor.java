@@ -10,6 +10,19 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * El banco: guarda el estado oficial de la partida y es el único que lo cambia.
+ *
+ * Cómo se reparte el trabajo:
+ * - Servidor acepta las conexiones y valida cada acción (turno, saldo, fase).
+ * - ManejadorCliente atiende a cada computadora en su propio hilo y le pasa
+ *   sus mensajes a los métodos de esta clase.
+ * - ManejadorCajero hace lo mismo con la Pico 2W (dados y tarjetas RFID).
+ * - Juego aplica las reglas del Monopoly.
+ *
+ * Como hay varios hilos (dos computadoras y el cajero), todo lo que toca la
+ * partida se hace dentro de synchronized (gameLock), de uno en uno.
+ */
 public class Servidor {
 
     private final int puerto;
@@ -125,18 +138,16 @@ public class Servidor {
             Socket socket =
                     socketJuego.accept();
 
-            int id =
-                    computadora;
-
             System.out.println(
                     "Computadora "
-                            + id
+                            + computadora
                             + " conectada: "
                             + socket.getInetAddress()
             );
 
+            // Cada computadora se atiende en su propio hilo
             hilosComputadoras.submit(
-                    () -> manejarCliente(socket, id)
+                    new ManejadorCliente(socket, computadora, this)
             );
 
             computadora++;
@@ -149,206 +160,18 @@ public class Servidor {
 
 
     // =========================================================
-    // MANEJAR CLIENTE
+    // CONEXIONES DE LAS COMPUTADORAS
     // =========================================================
 
-    private void manejarCliente(
-            Socket socket,
-            int computadora
-    ) {
+    // Lo llama ManejadorCliente cuando la computadora ya recibió su
+    // Bienvenida: desde ahí se le pueden mandar dados, avisos y estado.
+    void conectarComputadora(int computadora, ObjectOutputStream out) {
+        salidas[computadora] = out;
+    }
 
-        try {
-
-            ObjectOutputStream out =
-                    new ObjectOutputStream(
-                            socket.getOutputStream()
-                    );
-
-            out.flush();
-
-            ObjectInputStream in =
-                    new ObjectInputStream(
-                            socket.getInputStream()
-                    );
-
-            // Avisamos qué conexión recibió
-            out.writeObject(
-                    new Mensaje.Bienvenida(computadora)
-            );
-
-            out.flush();
-
-            // Desde aqui el servidor le puede escribir cuando quiera
-            salidas[computadora] = out;
-
-
-            while (true) {
-
-                Object objeto =
-                        in.readObject();
-
-                if (!(objeto instanceof Mensaje mensaje)) {
-                    continue;
-                }
-
-
-                // =================================================
-                // REGISTRAR
-                // =================================================
-
-                if (mensaje instanceof Mensaje.Registrarse registro) {
-
-                    registrarUsuario(
-                            registro.nombre(),
-                            out
-                    );
-                }
-
-
-                // =================================================
-                // LOGIN
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.IniciarSesion login) {
-
-                    iniciarSesion(
-                            login.nombre(),
-                            out
-                    );
-                }
-
-
-                // =================================================
-                // CREAR PARTIDA
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.CrearPartida crear) {
-
-                    crearPartida(
-                            crear.jugador1(),
-                            crear.jugador2(),
-                            computadora,
-                            out
-                    );
-                }
-
-
-                // =================================================
-                // ENTRAR A PARTIDA
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.UnirsePartida entrar) {
-
-                    entrarPartida(
-                            entrar.codigo(),
-                            entrar.jugador1(),
-                            entrar.jugador2(),
-                            computadora,
-                            out
-                    );
-                }
-
-
-                // =================================================
-                // ACCIONES DE LA PARTIDA (el cliente solo pide)
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.TirarDadosPrueba) {
-
-                    tirarDadosPrueba(computadora, out);
-                }
-
-                else if (mensaje instanceof Mensaje.ComprarPropiedad) {
-
-                    comprarPropiedad(computadora, out);
-                }
-
-                else if (mensaje instanceof Mensaje.ComprarCasa compra) {
-                    comprarCasa(computadora, out, compra.idPropiedad());
-                }
-
-                else if (mensaje instanceof Mensaje.ComprarHotel compra) {
-                    comprarHotel(computadora, out, compra.idPropiedad());
-                }
-
-                else if (mensaje instanceof Mensaje.TerminarTurno) {
-
-                    terminarTurno(computadora, out);
-                }
-
-                else if (mensaje instanceof Mensaje.PagarMultaCarcel) {
-
-                    salirDeCarcel(computadora, out, true);
-                }
-
-                else if (mensaje instanceof Mensaje.UsarCartaCarcel) {
-
-                    salirDeCarcel(computadora, out, false);
-                }
-
-                else if (mensaje instanceof Mensaje.ConsultarTransacciones consulta) {
-                    consultarTransacciones(computadora, out, consulta, false);
-                }
-
-                else if (mensaje instanceof Mensaje.ExportarTransacciones) {
-                    consultarTransacciones(computadora, out, null, true);
-                }
-
-
-                // =================================================
-                // REGISTRO DE TARJETA RFID
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.RegistrarTarjeta registro) {
-
-                    solicitarRegistroTarjeta(
-                            computadora,
-                            registro.jugadorLocal(),
-                            out
-                    );
-                }
-
-
-                // =================================================
-                // PING
-                // =================================================
-
-                else if (mensaje instanceof Mensaje.Ping ping) {
-
-                    escribir(
-                            out,
-                            new Mensaje.Pong(
-                                    ping.enviadoMs()
-                            )
-                    );
-                }
-            }
-
-        } catch (EOFException e) {
-
-            System.out.println(
-                    "Computadora "
-                            + computadora
-                            + " se desconectó."
-            );
-
-        } catch (Exception e) {
-
-            System.out.println(
-                    "Error con la computadora "
-                            + computadora
-            );
-
-            e.printStackTrace();
-
-        } finally {
-
-            hilosComputadoras.submit(
-                    () -> {
-                        // El servidor sigue funcionando
-                    }
-            );
-        }
+    // Lo llama ManejadorCliente al perder la conexión: ya no se le escribe.
+    void desconectarComputadora(int computadora) {
+        salidas[computadora] = null;
     }
 
 
@@ -356,7 +179,7 @@ public class Servidor {
     // REGISTRAR USUARIO
     // =========================================================
 
-    private void registrarUsuario(
+    void registrarUsuario(
             String nombre,
             ObjectOutputStream out
     ) throws IOException {
@@ -417,7 +240,7 @@ public class Servidor {
     // LOGIN
     // =========================================================
 
-    private void iniciarSesion(
+    void iniciarSesion(
             String nombre,
             ObjectOutputStream out
     ) throws IOException {
@@ -471,7 +294,7 @@ public class Servidor {
     // CREAR PARTIDA
     // =========================================================
 
-    private void crearPartida(
+    void crearPartida(
             String jugador1,
             String jugador2,
             int computadora,
@@ -583,7 +406,7 @@ public class Servidor {
     // ENTRAR A PARTIDA
     // =========================================================
 
-    private void entrarPartida(
+    void entrarPartida(
             String codigo,
             String jugador1,
             String jugador2,
@@ -807,7 +630,7 @@ public class Servidor {
     // (respuestas) y el del cajero (dados). synchronized(out) hace que
     // escriban de uno en uno; si no, los bytes se mezclan y el stream
     // se corrompe.
-    private void escribir(
+    void escribir(
             ObjectOutputStream out,
             Mensaje mensaje
     ) throws IOException {
@@ -974,7 +797,7 @@ public class Servidor {
         return null;
     }
 
-    private void tirarDadosPrueba(
+    void tirarDadosPrueba(
             int computadora,
             ObjectOutputStream out
     ) throws IOException {
@@ -1005,7 +828,7 @@ public class Servidor {
     // PARTIDA: COMPRAR Y TERMINAR TURNO
     // =========================================================
 
-    private void comprarPropiedad(
+    void comprarPropiedad(
             int computadora,
             ObjectOutputStream out
     ) throws IOException {
@@ -1070,11 +893,11 @@ public class Servidor {
         }
     }
 
-    private void comprarCasa(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
+    void comprarCasa(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
         comprarConstruccion(computadora, out, idPropiedad, false);
     }
 
-    private void comprarHotel(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
+    void comprarHotel(int computadora, ObjectOutputStream out, int idPropiedad) throws IOException {
         comprarConstruccion(computadora, out, idPropiedad, true);
     }
 
@@ -1111,7 +934,7 @@ public class Servidor {
 
     // Estando preso y antes de tirar: pagar la multa (conMulta) o usar la carta.
     // Si sale, tira normal después.
-    private void salirDeCarcel(
+    void salirDeCarcel(
             int computadora,
             ObjectOutputStream out,
             boolean conMulta
@@ -1155,7 +978,7 @@ public class Servidor {
         }
     }
 
-    private void terminarTurno(
+    void terminarTurno(
             int computadora,
             ObjectOutputStream out
     ) throws IOException {
@@ -1264,7 +1087,7 @@ public class Servidor {
 
     // Foto de la partida que se manda a los clientes
     /** Consultar y exportar no cambian el juego y se permiten incluso al finalizar. */
-    private void consultarTransacciones(int computadora, ObjectOutputStream out,
+    void consultarTransacciones(int computadora, ObjectOutputStream out,
             Mensaje.ConsultarTransacciones consulta, boolean exportacion) throws IOException {
         synchronized (gameLock) {
             boolean participante = false;
@@ -1569,7 +1392,7 @@ public class Servidor {
     // Una computadora avisa que la próxima tarjeta que lea el cajero es de
     // su jugador local (0 o 1). Si la solicitud no se puede atender, se le
     // contesta de una vez con un ResultadoTarjeta sin uid.
-    private void solicitarRegistroTarjeta(
+    void solicitarRegistroTarjeta(
             int computadora,
             int indiceLocal,
             ObjectOutputStream out
