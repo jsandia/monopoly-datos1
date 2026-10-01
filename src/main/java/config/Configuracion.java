@@ -94,9 +94,6 @@ public final class Configuracion {
     // ARCHIVOS
     // =========================================================
 
-    public static final String ARCHIVO_USUARIOS = "usuarios.txt";
-    public static final String ARCHIVO_PARTIDAS = "partidas.txt";
-
     /** Carpeta donde se guarda el historial de transacciones de cada partida. */
     public static final String CARPETA_TRANSACCIONES = "transacciones";
 

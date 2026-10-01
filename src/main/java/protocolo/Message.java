@@ -5,10 +5,8 @@ import java.io.Serializable;
 public sealed interface Message extends Serializable
         permits Message.Welcome,
         Message.PlayerMove,
-        Message.GameState,
         Message.Ping,
         Message.Pong,
-        Message.PlayerDisconnected,
         Message.Register,
         Message.Login,
         Message.CreateGame,
@@ -41,20 +39,9 @@ public sealed interface Message extends Serializable
             String action
     ) implements Message {}
 
-    record GameState(
-            double p0x,
-            double p0y,
-            double p1x,
-            double p1y,
-            int score0,
-            int score1
-    ) implements Message {}
-
     record Ping(long timestamp) implements Message {}
 
     record Pong(long timestamp) implements Message {}
-
-    record PlayerDisconnected(int playerId) implements Message {}
 
 
     // =========================================================

@@ -65,9 +65,9 @@ Cuando priorices trabajo, priorizá por esta tabla. Las estructuras primero.
 ## Decisiones técnicas ya tomadas
 
 - **Java** con **Maven** (`groupId: cr.ac.tec`, `artifactId: monopoly`)
-- La máquina del líder tiene **JDK 26**. Antes de entregar hay que fijar
-  `<maven.compiler.release>` a la versión más baja que tenga el grupo y el profesor,
-  o el `.jar` no corre en su máquina.
+- **Java 26** (decidido el 1 de octubre de 2026). El proyecto se compila con JDK 26
+  y no se va a bajar de versión. Quien quiera correrlo, incluido el profesor,
+  necesita JDK 26 o superior.
 - **Swing** para la interfaz (viene en el JDK, sin dependencias extra). No JavaFX.
 - **Sockets TCP** con protocolo de texto por líneas (`COMANDO|arg1|arg2`), leído con
   `BufferedReader.readLine()` y escrito con `PrintWriter.println()`. Sin JSON.

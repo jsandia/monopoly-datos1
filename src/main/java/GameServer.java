@@ -38,19 +38,8 @@ public class GameServer {
     private final Random random =
             new Random();
 
-    // =========================================================
-    // ESTADO DEL JUEGO ORIGINAL
-    // =========================================================
-
-    private double p0x = 0;
-    private double p0y = 0;
-
-    private double p1x = 0;
-    private double p1y = 0;
-
-    private int score0 = 0;
-    private int score1 = 0;
-
+    // Un solo candado para todo el estado de la partida: lo usan los hilos
+    // de las dos computadoras y el del cajero.
     private final Object gameLock = new Object();
 
 
@@ -307,30 +296,19 @@ public class GameServer {
 
 
                 // =================================================
-                // MOVIMIENTO ORIGINAL
+                // REGISTRO DE TARJETA RFID
                 // =================================================
 
-                else if (mensaje instanceof Message.PlayerMove movimiento) {
+                // Se reutiliza PlayerMove para pedir el registro de una tarjeta.
+                else if (mensaje instanceof Message.PlayerMove movimiento
+                        && movimiento.action() != null
+                        && movimiento.action().startsWith("RFID_REGISTRAR_")) {
 
-                    // Se reutiliza el mensaje existente para solicitar registro RFID
-                    // sin modificar el protocolo cliente-servidor.
-                    if (movimiento.action() != null
-                            && movimiento.action().startsWith("RFID_REGISTRAR_")) {
-
-                        solicitarRegistroTarjeta(
-                                playerId,
-                                movimiento.action(),
-                                out
-                        );
-
-                    } else {
-
-                        procesarMovimiento(
-                                movimiento,
-                                playerId,
-                                out
-                        );
-                    }
+                    solicitarRegistroTarjeta(
+                            playerId,
+                            movimiento.action(),
+                            out
+                    );
                 }
 
 
@@ -821,60 +799,6 @@ public class GameServer {
                         mensaje
                 )
         );
-    }
-
-
-    // =========================================================
-    // MOVIMIENTO ORIGINAL
-    // =========================================================
-
-    private void procesarMovimiento(
-            Message.PlayerMove movimiento,
-            int playerId,
-            ObjectOutputStream out
-    ) throws IOException {
-
-        synchronized (gameLock) {
-
-            if (playerId == 0) {
-
-                p0x =
-                        movimiento.x();
-
-                p0y =
-                        movimiento.y();
-
-            } else {
-
-                p1x =
-                        movimiento.x();
-
-                p1y =
-                        movimiento.y();
-            }
-
-            if (movimiento.action() != null) {
-
-                if (playerId == 0) {
-                    score0++;
-                } else {
-                    score1++;
-                }
-            }
-
-
-            Message.GameState estado =
-                    new Message.GameState(
-                            p0x,
-                            p0y,
-                            p1x,
-                            p1y,
-                            score0,
-                            score1
-                    );
-
-            escribir(out, estado);
-        }
     }
 
 
