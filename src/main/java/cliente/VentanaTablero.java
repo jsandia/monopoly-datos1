@@ -14,6 +14,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -143,7 +144,12 @@ public class VentanaTablero extends JFrame {
         areaConsola.setWrapStyleWord(true);
         areaConsola.setFont(new Font("Monospaced", Font.PLAIN, 11));
         areaConsola.setBackground(new Color(0xEAEDED));
-        areaConsola.setBorder(BorderFactory.createTitledBorder("Registro de Partida"));
+
+        // El registro va dentro de un JScrollPane: sin él, el JTextArea crece hacia
+        // abajo y los mensajes nuevos quedan fuera de la ventana, sin forma de verlos.
+        JScrollPane scrollConsola = new JScrollPane(areaConsola);
+        scrollConsola.setBorder(BorderFactory.createTitledBorder("Registro de Partida"));
+        scrollConsola.setPreferredSize(new Dimension(248, 260));
 
         JPanel panelBotones = new JPanel();
         panelBotones.setLayout(new BoxLayout(panelBotones, BoxLayout.Y_AXIS));
@@ -186,7 +192,7 @@ public class VentanaTablero extends JFrame {
         panel.add(javax.swing.Box.createRigidArea(new Dimension(0, 10)));
         panel.add(panelBotones);
         panel.add(javax.swing.Box.createRigidArea(new Dimension(0, 10)));
-        panel.add(areaConsola);
+        panel.add(scrollConsola);
 
         return panel;
     }
@@ -310,6 +316,12 @@ public class VentanaTablero extends JFrame {
         } else {
             etiquetaIndicacion.setText(esMiTurno ? "Comprá o terminá el turno" : "Juega " + nombreEnTurno);
             mostrarCasilla(modeloTablero.obtenerCasilla(estado.posiciones()[enTurno]));
+            if (estado.enCarcel()[enTurno]) {
+                // La casilla 10 describe la visita; si está preso hay que decirlo claro
+                areaDescripcion.setText("🔒 " + nombreEnTurno + " está PRESO en la cárcel.\n"
+                        + "En su próximo turno puede pagar la multa, usar una carta "
+                        + "o tirar buscando dobles.");
+            }
         }
 
         // Los botones solo se prenden si el jugador en turno es de esta computadora.
@@ -370,6 +382,8 @@ public class VentanaTablero extends JFrame {
 
     private void registrarLog(String mensaje) {
         areaConsola.append(mensaje + "\n");
+        // Mueve el cursor al final: el JScrollPane baja solo hasta el último mensaje
+        areaConsola.setCaretPosition(areaConsola.getDocument().getLength());
     }
 
     public static void main(String[] args) {

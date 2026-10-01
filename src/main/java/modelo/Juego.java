@@ -260,9 +260,16 @@ public class Juego {
         String nombreMazo = (tipoMazo == CasillaEvento.Tipo.SUERTE) ? "Suerte" : "Arca Comunal";
         log.append("\n").append(nombreMazo).append(": \"").append(carta.getTexto()).append("\"");
 
+        int saldoAntes = jugador.getSaldo();
         boolean seLaQueda = aplicarCarta(jugador, carta, log);
         if (!seLaQueda) {
             mazo.encolar(carta);
+        }
+
+        // Confirma el efecto en plata para que se vea que la carta se aplico
+        if (jugador.getSaldo() != saldoAntes) {
+            log.append("\nSaldo de ").append(jugador.getNombre()).append(": ₡").append(saldoAntes)
+                    .append(" → ₡").append(jugador.getSaldo()).append(".");
         }
     }
 
