@@ -2,85 +2,101 @@ package protocolo;
 
 import java.io.Serializable;
 
-public sealed interface Message extends Serializable
-        permits Message.Welcome,
-        Message.PlayerMove,
-        Message.Ping,
-        Message.Pong,
-        Message.Register,
-        Message.Login,
-        Message.CreateGame,
-        Message.JoinGame,
-        Message.Response,
-        Message.TirarDadosPrueba,
-        Message.ComprarPropiedad,
-        Message.ComprarCasa,
-        Message.ComprarHotel,
-        Message.TerminarTurno,
-        Message.PagarMultaCarcel,
-        Message.UsarCartaCarcel,
-        Message.Dados,
-        Message.Aviso,
-        Message.EstadoJuego,
-        Message.ConsultarTransacciones,
-        Message.ExportarTransacciones,
-        Message.HistorialTransacciones {
+/**
+ * Protocolo entre las computadoras (clientes Swing) y el servidor.
+ *
+ * Cada mensaje es un record que viaja por el socket TCP con
+ * ObjectOutputStream / ObjectInputStream. Por eso extiende Serializable.
+ *
+ * "sealed ... permits" significa que solo los records de la lista pueden
+ * ser un Mensaje: nadie puede inventar uno nuevo desde otro archivo.
+ *
+ * Los clientes solo mandan intenciones (tirar, comprar, terminar turno);
+ * el servidor valida, cambia el estado y responde a todos con Aviso y
+ * EstadoJuego.
+ *
+ * Ojo: como viaja el nombre de cada clase, las dos computadoras tienen
+ * que correr la misma versión del programa.
+ */
+public sealed interface Mensaje extends Serializable
+        permits Mensaje.Bienvenida,
+        Mensaje.PlayerMove,
+        Mensaje.Ping,
+        Mensaje.Pong,
+        Mensaje.Registrarse,
+        Mensaje.IniciarSesion,
+        Mensaje.CrearPartida,
+        Mensaje.UnirsePartida,
+        Mensaje.Respuesta,
+        Mensaje.TirarDadosPrueba,
+        Mensaje.ComprarPropiedad,
+        Mensaje.ComprarCasa,
+        Mensaje.ComprarHotel,
+        Mensaje.TerminarTurno,
+        Mensaje.PagarMultaCarcel,
+        Mensaje.UsarCartaCarcel,
+        Mensaje.Dados,
+        Mensaje.Aviso,
+        Mensaje.EstadoJuego,
+        Mensaje.ConsultarTransacciones,
+        Mensaje.ExportarTransacciones,
+        Mensaje.HistorialTransacciones {
 
     // =========================================================
-    // MENSAJES ORIGINALES
+    // CONEXIÓN
     // =========================================================
 
-    record Welcome(int playerId) implements Message {}
+    record Bienvenida(int computadora) implements Mensaje {}
 
     record PlayerMove(
-            int playerId,
+            int computadora,
             double x,
             double y,
             String action
-    ) implements Message {}
+    ) implements Mensaje {}
 
-    record Ping(long timestamp) implements Message {}
+    record Ping(long enviadoMs) implements Mensaje {}
 
-    record Pong(long timestamp) implements Message {}
+    record Pong(long enviadoMs) implements Mensaje {}
 
 
     // =========================================================
-    // REGISTRO Y LOGIN
+    // REGISTRO E INICIO DE SESIÓN
     // =========================================================
 
-    record Register(
+    record Registrarse(
             String nombre
-    ) implements Message {}
+    ) implements Mensaje {}
 
-    record Login(
+    record IniciarSesion(
             String nombre
-    ) implements Message {}
+    ) implements Mensaje {}
 
 
     // =========================================================
     // PARTIDAS
     // =========================================================
 
-    record CreateGame(
+    record CrearPartida(
             String jugador1,
             String jugador2
-    ) implements Message {}
+    ) implements Mensaje {}
 
-    record JoinGame(
+    record UnirsePartida(
             String codigo,
             String jugador1,
             String jugador2
-    ) implements Message {}
+    ) implements Mensaje {}
 
 
     // =========================================================
     // RESPUESTA DEL SERVIDOR
     // =========================================================
 
-    record Response(
+    record Respuesta(
             String tipo,
             String mensaje
-    ) implements Message {}
+    ) implements Mensaje {}
 
 
     // =========================================================
@@ -90,34 +106,34 @@ public sealed interface Message extends Serializable
     // revisa que le toque a un jugador de esa computadora y decide.
 
     /** Pide que el SERVIDOR tire dados al azar (para probar sin el cajero). */
-    record TirarDadosPrueba() implements Message {}
+    record TirarDadosPrueba() implements Mensaje {}
 
-    record ComprarPropiedad() implements Message {}
+    record ComprarPropiedad() implements Mensaje {}
 
-    record ComprarCasa(int idPropiedad) implements Message {}
+    record ComprarCasa(int idPropiedad) implements Mensaje {}
 
-    record ComprarHotel(int idPropiedad) implements Message {}
+    record ComprarHotel(int idPropiedad) implements Mensaje {}
 
     /** Datos oficiales de una propiedad; propietario es el índice del jugador o -1. */
     record EstadoPropiedad(int id, int propietario, int casas, boolean hotel,
             boolean hipotecada, int renta, int precioCasa, String motivoNoComprarCasa,
             int precioHotel, String motivoNoComprarHotel) implements Serializable {}
 
-    record TerminarTurno() implements Message {}
+    record TerminarTurno() implements Mensaje {}
 
     /** Estando preso y antes de tirar: pagar la multa para salir. */
-    record PagarMultaCarcel() implements Message {}
+    record PagarMultaCarcel() implements Mensaje {}
 
     /** Estando preso y antes de tirar: usar una carta "Salga de la cárcel". */
-    record UsarCartaCarcel() implements Message {}
+    record UsarCartaCarcel() implements Mensaje {}
 
     /** Filtros opcionales y orden; el servidor conserva y consulta el historial oficial. */
-    record ConsultarTransacciones(String jugador, String tipo, boolean recientesPrimero) implements Message {}
+    record ConsultarTransacciones(String jugador, String tipo, boolean recientesPrimero) implements Mensaje {}
 
-    record ExportarTransacciones() implements Message {}
+    record ExportarTransacciones() implements Mensaje {}
 
     /** Texto preparado por el servidor, para mostrar o guardar una copia en el cliente. */
-    record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Message {}
+    record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Mensaje {}
 
 
     // =========================================================
@@ -129,12 +145,12 @@ public sealed interface Message extends Serializable
             int indiceJugador,
             int dado1,
             int dado2
-    ) implements Message {}
+    ) implements Mensaje {}
 
     /** Una línea para el "Registro de Partida" (o un error solo para quien lo causó). */
     record Aviso(
             String texto
-    ) implements Message {}
+    ) implements Mensaje {}
 
     /**
      * Foto completa de la partida. Los arreglos tienen una posición por
@@ -166,5 +182,5 @@ public sealed interface Message extends Serializable
             int[] patrimonios,
             int ganador,
             boolean empate
-    ) implements Message {}
+    ) implements Mensaje {}
 }

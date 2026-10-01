@@ -1,4 +1,4 @@
-import protocolo.Message;
+import protocolo.Mensaje;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -13,13 +13,13 @@ public class Interfaz {
     // CONEXIÓN CON EL SERVIDOR
     // =========================================================
 
-    static GameClient cliente;
+    static Cliente cliente;
 
     // =========================================================
     // SERVIDOR
     // =========================================================
 
-    static GameServer servidor;
+    static Servidor servidor;
 
     static boolean servidorIniciado = false;
 
@@ -49,7 +49,7 @@ public class Interfaz {
         try {
 
             cliente =
-                    new GameClient();
+                    new Cliente();
 
             cliente.conectar();
 
@@ -271,18 +271,18 @@ public class Interfaz {
                             try {
 
                                 servidor =
-                                        new GameServer();
+                                        new Servidor();
 
 
                                 servidorIniciado = true;
 
 
                                 System.out.println(
-                                        "GameServer iniciado."
+                                        "Servidor iniciado."
                                 );
 
 
-                                servidor.start();
+                                servidor.iniciar();
 
 
                             } catch (IOException e) {
@@ -331,7 +331,7 @@ public class Interfaz {
         try {
 
             cliente =
-                    new GameClient();
+                    new Cliente();
 
 
             cliente.conectar();
@@ -341,7 +341,7 @@ public class Interfaz {
                     ventanaPrincipal,
 
                     "¡Servidor iniciado correctamente!\n\n"
-                            + "El GameClient está conectado.",
+                            + "El cliente está conectado.",
 
                     "Servidor iniciado",
 
@@ -355,7 +355,7 @@ public class Interfaz {
                     ventanaPrincipal,
 
                     "El servidor se inició,\n"
-                            + "pero no se pudo conectar el GameClient.\n\n"
+                            + "pero no se pudo conectar el cliente.\n\n"
                             + e.getMessage(),
 
                     "Error de conexión",
@@ -429,7 +429,7 @@ public class Interfaz {
 
             try {
 
-                Message.Response respuesta =
+                Mensaje.Respuesta respuesta =
                         cliente.registrar(nombre);
 
 
@@ -568,7 +568,7 @@ public class Interfaz {
 
         try {
 
-            Message.Response respuesta =
+            Mensaje.Respuesta respuesta =
                     cliente.crearPartida(
                             nombreJugador1,
                             nombreJugador2
@@ -661,9 +661,9 @@ public class Interfaz {
 
 
         // Durante el registro, usamos el oyente normal que ya existía
-        // en GameClient. Al abrir el tablero, abrirTablero() lo reemplaza.
+        // en Cliente. Al abrir el tablero, abrirTablero() lo reemplaza.
         cliente.setOyente(mensaje -> {
-            if (!(mensaje instanceof Message.Aviso aviso)) return;
+            if (!(mensaje instanceof Mensaje.Aviso aviso)) return;
 
             String texto = aviso.texto();
             if (texto == null || !texto.startsWith("__RFID__;")) return;
@@ -696,8 +696,8 @@ public class Interfaz {
         if (cliente == null) return;
 
         cliente.enviarAccion(
-                new Message.PlayerMove(
-                        cliente.getPlayerId(),
+                new Mensaje.PlayerMove(
+                        cliente.getNumeroComputadora(),
                         0,
                         0,
                         "RFID_REGISTRAR_" + indiceLocal
@@ -844,7 +844,7 @@ public class Interfaz {
 
         try {
 
-            Message.Response respuesta =
+            Mensaje.Respuesta respuesta =
                     cliente.entrarPartida(
                             codigo,
                             nombreJugador1,
@@ -921,9 +921,9 @@ public class Interfaz {
 
         SwingUtilities.invokeLater(() -> {
 
-            cliente.VentanaTablero ventana =
-                    new cliente.VentanaTablero(
-                            cliente.getPlayerId(),
+            VentanaTablero ventana =
+                    new VentanaTablero(
+                            cliente.getNumeroComputadora(),
                             cliente::enviarAccion
                     );
 

@@ -2,7 +2,7 @@ package cliente;
 
 import modelo.Propiedad;
 import modelo.Tablero;
-import protocolo.Message;
+import protocolo.Mensaje;
 
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
@@ -21,12 +21,12 @@ public final class PreviewHoteles {
                 Tablero tablero = new Tablero();
                 PanelTablero panel = new PanelTablero(tablero);
                 panel.setSize(1000, 1000);
-                Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[tablero.tamaño()];
+                Mensaje.EstadoPropiedad[] propiedades = new Mensaje.EstadoPropiedad[tablero.tamaño()];
                 for (int id : new int[]{1, 11, 21, 31, 3}) {
                     Propiedad propiedad = (Propiedad) tablero.obtenerCasilla(id);
                     for (int casa = 0; casa < 4; casa++) propiedad.agregarCasa();
                     if (id != 3) propiedad.construirHotel();
-                    propiedades[id] = new Message.EstadoPropiedad(id, 0, propiedad.getCantidadCasas(),
+                    propiedades[id] = new Mensaje.EstadoPropiedad(id, 0, propiedad.getCantidadCasas(),
                             propiedad.tieneHotel(), false, propiedad.calcularAlquiler(), propiedad.getPrecioCasa(),
                             "Máximo de casas o hotel construido.", propiedad.getPrecioHotel(),
                             propiedad.tieneHotel() ? "Ya tiene hotel." : null);

@@ -84,7 +84,7 @@ public final class Configuracion {
     /** Puerto UDP para que los clientes encuentren al servidor en la red. */
     public static final int PUERTO_DESCUBRIMIENTO = 5001;
 
-    /** Puerto de ConnectionTest. Distinto de todos los anteriores para no chocar. */
+    /** Puerto de PruebaConexion. Distinto de todos los anteriores para no chocar. */
     public static final int PUERTO_PRUEBA_CONEXION = 5060;
 
     /** Cuánto espera un cliente buscando al servidor antes de rendirse. */

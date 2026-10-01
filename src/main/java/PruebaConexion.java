@@ -1,5 +1,5 @@
 import config.Configuracion;
-import protocolo.Message;
+import protocolo.Mensaje;
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
@@ -10,47 +10,47 @@ import java.util.Scanner;
  * se encuentran solas en la red y que la conexión funciona bien.
  *
  * Uso:
- *   En UNA computadora:  java ConnectionTest host
- *   En la OTRA:          java ConnectionTest client
+ *   En UNA computadora:  java PruebaConexion servidor
+ *   En la OTRA:          java PruebaConexion cliente
  *
  * También se puede correr SIN argumentos (por ejemplo, apretando ▶️
  * directo en IntelliJ sin configurar nada): en ese caso pregunta por
- * consola si es host o client.
+ * consola si es servidor o cliente.
  *
- * El cliente descubre al host solo (mismo mecanismo de Discovery.java
+ * El cliente descubre al servidor solo (mismo mecanismo de Descubrimiento.java
  * que usa el juego), se conecta, y hace 5 "pings" midiendo cuánto tarda
  * cada ida y vuelta. Si ves los 5 tiempos y el promedio final, la
  * conexión está funcionando correctamente.
  */
-public class ConnectionTest {
+public class PruebaConexion {
 
     public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
         String modo = (args.length > 0) ? args[0] : preguntarModo();
 
         switch (modo) {
-            case "host"   -> runHost();
-            case "client" -> runClient();
-            default       -> System.out.println("Argumento inválido. Usá 'host' o 'client'.");
+            case "servidor" -> ejecutarServidor();
+            case "cliente"  -> ejecutarCliente();
+            default         -> System.out.println("Argumento inválido. Usá 'servidor' o 'cliente'.");
         }
     }
 
-    /** Pregunta por consola si esta computadora es host o client (cuando no se pasó como argumento). */
+    /** Pregunta por consola si esta computadora es el servidor o el cliente (cuando no se pasó como argumento). */
     private static String preguntarModo() {
         Scanner scanner = new Scanner(System.in);
         while (true) {
-            System.out.print("¿Esta computadora es el host o el client? (host/client): ");
+            System.out.print("¿Esta computadora es el servidor o el cliente? (servidor/cliente): ");
             String respuesta = scanner.nextLine().trim().toLowerCase();
-            if (respuesta.equals("host") || respuesta.equals("client")) {
+            if (respuesta.equals("servidor") || respuesta.equals("cliente")) {
                 return respuesta;
             }
-            System.out.println("Escribí exactamente 'host' o 'client'.");
+            System.out.println("Escribí exactamente 'servidor' o 'cliente'.");
         }
     }
 
-    private static void runHost() throws IOException, ClassNotFoundException {
+    private static void ejecutarServidor() throws IOException, ClassNotFoundException {
         try (ServerSocket serverSocket = new ServerSocket(Configuracion.PUERTO_PRUEBA_CONEXION)) {
             System.out.println("Anunciándose en la red y esperando a la otra computadora...");
-            Discovery.hostAnnounce(Configuracion.PUERTO_PRUEBA_CONEXION);
+            Descubrimiento.anunciarServidor(Configuracion.PUERTO_PRUEBA_CONEXION);
 
             try (Socket socket = serverSocket.accept()) {
                 System.out.println("¡Conexión recibida desde " + socket.getInetAddress() + "!");
@@ -60,9 +60,9 @@ public class ConnectionTest {
 
                 System.out.println("Respondiendo pings de prueba...");
                 while (true) {
-                    Message msg = (Message) in.readObject();
-                    if (msg instanceof Message.Ping ping) {
-                        out.writeObject(new Message.Pong(ping.timestamp()));
+                    Mensaje mensaje = (Mensaje) in.readObject();
+                    if (mensaje instanceof Mensaje.Ping ping) {
+                        out.writeObject(new Mensaje.Pong(ping.enviadoMs()));
                         out.flush();
                     }
                 }
@@ -72,21 +72,21 @@ public class ConnectionTest {
         }
     }
 
-    private static void runClient() throws IOException, ClassNotFoundException, InterruptedException {
+    private static void ejecutarCliente() throws IOException, ClassNotFoundException, InterruptedException {
         System.out.println("Buscando la otra computadora en la red...");
 
-        Discovery.HostInfo hostInfo;
+        Descubrimiento.InfoServidor infoServidor;
         try {
-            hostInfo = Discovery.discoverHost(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
+            infoServidor = Descubrimiento.buscarServidor(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
         } catch (IOException e) {
             System.out.println("No se encontró ninguna computadora anunciándose.");
-            System.out.println("¿Corriste 'java ConnectionTest host' en la otra máquina? ¿Están en la misma red WiFi?");
+            System.out.println("¿Corriste 'java PruebaConexion servidor' en la otra máquina? ¿Están en la misma red WiFi?");
             return;
         }
 
-        System.out.println("Encontrada en " + hostInfo.address().getHostAddress() + ":" + hostInfo.port());
+        System.out.println("Encontrada en " + infoServidor.direccion().getHostAddress() + ":" + infoServidor.puerto());
 
-        try (Socket socket = new Socket(hostInfo.address(), hostInfo.port())) {
+        try (Socket socket = new Socket(infoServidor.direccion(), infoServidor.puerto())) {
             System.out.println("Conexión TCP establecida correctamente.");
             System.out.println("Midiendo latencia con 5 pings...\n");
 
@@ -94,22 +94,22 @@ public class ConnectionTest {
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
             out.flush();
 
-            long totalRtt = 0;
-            int count = 5;
-            for (int i = 1; i <= count; i++) {
-                long start = System.currentTimeMillis();
-                out.writeObject(new Message.Ping(start));
+            long totalMs = 0;
+            int cantidad = 5;
+            for (int i = 1; i <= cantidad; i++) {
+                long inicio = System.currentTimeMillis();
+                out.writeObject(new Mensaje.Ping(inicio));
                 out.flush();
 
-                Message.Pong pong = (Message.Pong) in.readObject();
-                long rtt = System.currentTimeMillis() - pong.timestamp();
-                totalRtt += rtt;
-                System.out.println("Ping " + i + ": " + rtt + " ms");
+                Mensaje.Pong pong = (Mensaje.Pong) in.readObject();
+                long idaYVuelta = System.currentTimeMillis() - pong.enviadoMs();
+                totalMs += idaYVuelta;
+                System.out.println("Ping " + i + ": " + idaYVuelta + " ms");
                 Thread.sleep(300);
             }
 
             System.out.println("\n--- Resultado ---");
-            System.out.println("Conexión OK. Latencia promedio: " + (totalRtt / count) + " ms");
+            System.out.println("Conexión OK. Latencia promedio: " + (totalMs / cantidad) + " ms");
             System.out.println("(por WiFi local, algo entre 1-20 ms es normal; más de eso puede indicar interferencia)");
         }
     }

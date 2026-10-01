@@ -1,5 +1,5 @@
 import config.Configuracion;
-import protocolo.Message;
+import protocolo.Mensaje;
 import modelo.Casilla;
 import modelo.Juego;
 import modelo.Jugador;
@@ -10,15 +10,15 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class GameServer {
+public class Servidor {
 
-    private final int port;
+    private final int puerto;
 
-    private ServerSocket serverSocket;
+    private ServerSocket socketJuego;
 
     private ServerSocket servidorCajero;
 
-    private final ExecutorService pool =
+    private final ExecutorService hilosComputadoras =
             Executors.newFixedThreadPool(4);
 
     // =========================================================
@@ -47,7 +47,7 @@ public class GameServer {
     // PARTIDA DE MONOPOLY (vive SOLO aqui, los clientes solo la dibujan)
     // =========================================================
 
-    // Salida de cada computadora (indice = playerId). Sirve para
+    // Salida de cada computadora (indice = computadora). Sirve para
     // mandarles mensajes sin que los pidan: dados, avisos, estado.
     private final ObjectOutputStream[] salidas =
             new ObjectOutputStream[2];
@@ -85,12 +85,12 @@ public class GameServer {
     // CONSTRUCTORES
     // =========================================================
 
-    public GameServer() {
+    public Servidor() {
         this(Configuracion.PUERTO_JUEGO);
     }
 
-    public GameServer(int port) {
-        this.port = port;
+    public Servidor(int puerto) {
+        this.puerto = puerto;
     }
 
 
@@ -98,17 +98,17 @@ public class GameServer {
     // INICIAR SERVIDOR
     // =========================================================
 
-    public void start() throws IOException {
+    public void iniciar() throws IOException {
 
-        serverSocket =
-                new ServerSocket(port);
+        socketJuego =
+                new ServerSocket(puerto);
 
         System.out.println(
                 "Servidor iniciado en puerto "
-                        + port
+                        + puerto
         );
 
-        Discovery.hostAnnounce(port);
+        Descubrimiento.anunciarServidor(puerto);
 
         // CAJERO: se abre ANTES del ciclo de abajo, porque ese ciclo
         // se queda esperando en accept() hasta que lleguen las 2 computadoras
@@ -118,15 +118,15 @@ public class GameServer {
                 "Esperando 2 computadoras..."
         );
 
-        int playerId = 0;
+        int computadora = 0;
 
-        while (playerId < 2) {
+        while (computadora < 2) {
 
             Socket socket =
-                    serverSocket.accept();
+                    socketJuego.accept();
 
             int id =
-                    playerId;
+                    computadora;
 
             System.out.println(
                     "Computadora "
@@ -135,11 +135,11 @@ public class GameServer {
                             + socket.getInetAddress()
             );
 
-            pool.submit(
+            hilosComputadoras.submit(
                     () -> manejarCliente(socket, id)
             );
 
-            playerId++;
+            computadora++;
         }
 
         System.out.println(
@@ -154,7 +154,7 @@ public class GameServer {
 
     private void manejarCliente(
             Socket socket,
-            int playerId
+            int computadora
     ) {
 
         try {
@@ -173,13 +173,13 @@ public class GameServer {
 
             // Avisamos qué conexión recibió
             out.writeObject(
-                    new Message.Welcome(playerId)
+                    new Mensaje.Bienvenida(computadora)
             );
 
             out.flush();
 
             // Desde aqui el servidor le puede escribir cuando quiera
-            salidas[playerId] = out;
+            salidas[computadora] = out;
 
 
             while (true) {
@@ -187,7 +187,7 @@ public class GameServer {
                 Object objeto =
                         in.readObject();
 
-                if (!(objeto instanceof Message mensaje)) {
+                if (!(objeto instanceof Mensaje mensaje)) {
                     continue;
                 }
 
@@ -196,7 +196,7 @@ public class GameServer {
                 // REGISTRAR
                 // =================================================
 
-                if (mensaje instanceof Message.Register registro) {
+                if (mensaje instanceof Mensaje.Registrarse registro) {
 
                     registrarUsuario(
                             registro.nombre(),
@@ -209,7 +209,7 @@ public class GameServer {
                 // LOGIN
                 // =================================================
 
-                else if (mensaje instanceof Message.Login login) {
+                else if (mensaje instanceof Mensaje.IniciarSesion login) {
 
                     iniciarSesion(
                             login.nombre(),
@@ -222,12 +222,12 @@ public class GameServer {
                 // CREAR PARTIDA
                 // =================================================
 
-                else if (mensaje instanceof Message.CreateGame crear) {
+                else if (mensaje instanceof Mensaje.CrearPartida crear) {
 
                     crearPartida(
                             crear.jugador1(),
                             crear.jugador2(),
-                            playerId,
+                            computadora,
                             out
                     );
                 }
@@ -237,13 +237,13 @@ public class GameServer {
                 // ENTRAR A PARTIDA
                 // =================================================
 
-                else if (mensaje instanceof Message.JoinGame entrar) {
+                else if (mensaje instanceof Mensaje.UnirsePartida entrar) {
 
                     entrarPartida(
                             entrar.codigo(),
                             entrar.jugador1(),
                             entrar.jugador2(),
-                            playerId,
+                            computadora,
                             out
                     );
                 }
@@ -253,45 +253,45 @@ public class GameServer {
                 // ACCIONES DE LA PARTIDA (el cliente solo pide)
                 // =================================================
 
-                else if (mensaje instanceof Message.TirarDadosPrueba) {
+                else if (mensaje instanceof Mensaje.TirarDadosPrueba) {
 
-                    tirarDadosPrueba(playerId, out);
+                    tirarDadosPrueba(computadora, out);
                 }
 
-                else if (mensaje instanceof Message.ComprarPropiedad) {
+                else if (mensaje instanceof Mensaje.ComprarPropiedad) {
 
-                    comprarPropiedad(playerId, out);
+                    comprarPropiedad(computadora, out);
                 }
 
-                else if (mensaje instanceof Message.ComprarCasa compra) {
-                    comprarCasa(playerId, out, compra.idPropiedad());
+                else if (mensaje instanceof Mensaje.ComprarCasa compra) {
+                    comprarCasa(computadora, out, compra.idPropiedad());
                 }
 
-                else if (mensaje instanceof Message.ComprarHotel compra) {
-                    comprarHotel(playerId, out, compra.idPropiedad());
+                else if (mensaje instanceof Mensaje.ComprarHotel compra) {
+                    comprarHotel(computadora, out, compra.idPropiedad());
                 }
 
-                else if (mensaje instanceof Message.TerminarTurno) {
+                else if (mensaje instanceof Mensaje.TerminarTurno) {
 
-                    terminarTurno(playerId, out);
+                    terminarTurno(computadora, out);
                 }
 
-                else if (mensaje instanceof Message.PagarMultaCarcel) {
+                else if (mensaje instanceof Mensaje.PagarMultaCarcel) {
 
-                    salirDeCarcel(playerId, out, true);
+                    salirDeCarcel(computadora, out, true);
                 }
 
-                else if (mensaje instanceof Message.UsarCartaCarcel) {
+                else if (mensaje instanceof Mensaje.UsarCartaCarcel) {
 
-                    salirDeCarcel(playerId, out, false);
+                    salirDeCarcel(computadora, out, false);
                 }
 
-                else if (mensaje instanceof Message.ConsultarTransacciones consulta) {
-                    consultarTransacciones(playerId, out, consulta, false);
+                else if (mensaje instanceof Mensaje.ConsultarTransacciones consulta) {
+                    consultarTransacciones(computadora, out, consulta, false);
                 }
 
-                else if (mensaje instanceof Message.ExportarTransacciones) {
-                    consultarTransacciones(playerId, out, null, true);
+                else if (mensaje instanceof Mensaje.ExportarTransacciones) {
+                    consultarTransacciones(computadora, out, null, true);
                 }
 
 
@@ -300,12 +300,12 @@ public class GameServer {
                 // =================================================
 
                 // Se reutiliza PlayerMove para pedir el registro de una tarjeta.
-                else if (mensaje instanceof Message.PlayerMove movimiento
+                else if (mensaje instanceof Mensaje.PlayerMove movimiento
                         && movimiento.action() != null
                         && movimiento.action().startsWith("RFID_REGISTRAR_")) {
 
                     solicitarRegistroTarjeta(
-                            playerId,
+                            computadora,
                             movimiento.action(),
                             out
                     );
@@ -316,12 +316,12 @@ public class GameServer {
                 // PING
                 // =================================================
 
-                else if (mensaje instanceof Message.Ping ping) {
+                else if (mensaje instanceof Mensaje.Ping ping) {
 
                     escribir(
                             out,
-                            new Message.Pong(
-                                    ping.timestamp()
+                            new Mensaje.Pong(
+                                    ping.enviadoMs()
                             )
                     );
                 }
@@ -331,7 +331,7 @@ public class GameServer {
 
             System.out.println(
                     "Computadora "
-                            + playerId
+                            + computadora
                             + " se desconectó."
             );
 
@@ -339,14 +339,14 @@ public class GameServer {
 
             System.out.println(
                     "Error con la computadora "
-                            + playerId
+                            + computadora
             );
 
             e.printStackTrace();
 
         } finally {
 
-            pool.submit(
+            hilosComputadoras.submit(
                     () -> {
                         // El servidor sigue funcionando
                     }
@@ -794,7 +794,7 @@ public class GameServer {
 
         escribir(
                 out,
-                new Message.Response(
+                new Mensaje.Respuesta(
                         tipo,
                         mensaje
                 )
@@ -812,7 +812,7 @@ public class GameServer {
     // se corrompe.
     private void escribir(
             ObjectOutputStream out,
-            Message mensaje
+            Mensaje mensaje
     ) throws IOException {
 
         synchronized (out) {
@@ -830,7 +830,7 @@ public class GameServer {
 
     // Manda el mismo mensaje a las 2 computadoras
     private void difundir(
-            Message mensaje
+            Mensaje mensaje
     ) {
 
         for (ObjectOutputStream out : salidas) {
@@ -897,7 +897,7 @@ public class GameServer {
             }
 
             yaTiro = false;
-            difundir(new Message.Aviso("Historial de transacciones: " + juego.getArchivoTransacciones()));
+            difundir(new Mensaje.Aviso("Historial de transacciones: " + juego.getArchivoTransacciones()));
 
             System.out.println(
                     "Partida "
@@ -905,7 +905,7 @@ public class GameServer {
                             + " iniciada en el servidor."
             );
 
-            difundir(new Message.Aviso(
+            difundir(new Mensaje.Aviso(
                     "¡Empieza la partida! Turno de "
                             + juego.getJugadorActual().getNombre()
                             + ". Tirá los dados en el cajero."
@@ -956,16 +956,16 @@ public class GameServer {
         yaTiro = true;
 
         // Primero los dados, para que los clientes los animen...
-        difundir(new Message.Dados(
+        difundir(new Mensaje.Dados(
                 indiceQuienTiro,
                 dado1,
                 dado2
         ));
 
-        difundir(new Message.Aviso(resultado));
+        difundir(new Mensaje.Aviso(resultado));
 
         if (juego.esFinDeJuego()) {
-            difundir(new Message.Aviso(textoFinDePartida()));
+            difundir(new Mensaje.Aviso(textoFinDePartida()));
         } else if (!quienTiro.isActivo()) {
             // Quebró en su propio tiro: no tiene nada más que hacer en este turno
             pasarTurno();
@@ -987,7 +987,7 @@ public class GameServer {
             String error = validarTurno(computadora);
 
             if (error != null) {
-                escribir(out, new Message.Aviso(error));
+                escribir(out, new Mensaje.Aviso(error));
                 return;
             }
 
@@ -996,7 +996,7 @@ public class GameServer {
             String codigo = aplicarDados(dados[0], dados[1]);
 
             if (codigo != null) {
-                escribir(out, new Message.Aviso(
+                escribir(out, new Mensaje.Aviso(
                         "No se pueden tirar los dados ahora (" + codigo + ")."
                 ));
             }
@@ -1025,7 +1025,7 @@ public class GameServer {
             }
 
             if (error != null) {
-                escribir(out, new Message.Aviso(error));
+                escribir(out, new Mensaje.Aviso(error));
                 return;
             }
 
@@ -1037,7 +1037,7 @@ public class GameServer {
             if (!(casilla instanceof Propiedad propiedad)
                     || propiedad.tienePropietario()) {
 
-                escribir(out, new Message.Aviso(
+                escribir(out, new Mensaje.Aviso(
                         "Esa casilla no se puede comprar."
                 ));
                 return;
@@ -1045,7 +1045,7 @@ public class GameServer {
 
             if (actual.getSaldo() < propiedad.getPrecioCompra()) {
 
-                escribir(out, new Message.Aviso(
+                escribir(out, new Mensaje.Aviso(
                         "Saldo insuficiente para comprar "
                                 + propiedad.getNombre() + "."
                 ));
@@ -1053,7 +1053,7 @@ public class GameServer {
             }
 
             if (!actual.tieneTarjetaRegistrada()) {
-                escribir(out, new Message.Aviso(
+                escribir(out, new Mensaje.Aviso(
                         actual.getNombre() + " no tiene tarjeta RFID registrada."
                 ));
                 return;
@@ -1064,7 +1064,7 @@ public class GameServer {
             computadoraPendientePago = computadora;
             tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
-            escribir(out, new Message.Aviso(
+            escribir(out, new Mensaje.Aviso(
                     actual.getNombre()
                             + ", acerque su tarjeta RFID para pagar ₡"
                             + propiedad.getPrecioCompra()
@@ -1098,7 +1098,7 @@ public class GameServer {
             }
             if (error == null && !juego.getJugadorActual().tieneTarjetaRegistrada()) error = "El jugador no tiene tarjeta RFID registrada.";
             if (error != null) {
-                escribir(out, new Message.Aviso(error));
+                escribir(out, new Mensaje.Aviso(error));
                 if (juego != null) escribir(out, crearEstado());
                 return;
             }
@@ -1106,7 +1106,7 @@ public class GameServer {
             propiedadPendientePago = propiedad;
             computadoraPendientePago = computadora;
             tipoCompraPendiente = hotel ? TipoCompra.HOTEL : TipoCompra.CASA;
-            escribir(out, new Message.Aviso(jugadorPendientePago.getNombre()
+            escribir(out, new Mensaje.Aviso(jugadorPendientePago.getNombre()
                     + ", acerque su tarjeta RFID para pagar ₡" + (hotel ? propiedad.getPrecioHotel() : propiedad.getPrecioCasa())
                     + " y comprar " + (hotel ? "un hotel" : "una casa") + " en " + propiedad.getNombre() + "."));
         }
@@ -1133,7 +1133,7 @@ public class GameServer {
             }
 
             if (error != null) {
-                escribir(out, new Message.Aviso(error));
+                escribir(out, new Mensaje.Aviso(error));
                 return;
             }
 
@@ -1142,13 +1142,13 @@ public class GameServer {
                     : juego.usarCartaSalirCarcel();
 
             if (!salio) {
-                escribir(out, new Message.Aviso(conMulta
+                escribir(out, new Mensaje.Aviso(conMulta
                         ? "Saldo insuficiente para pagar la multa de ₡" + Configuracion.MULTA_CARCEL + "."
                         : actual.getNombre() + " no tiene cartas para salir de la cárcel."));
                 return;
             }
 
-            difundir(new Message.Aviso(actual.getNombre()
+            difundir(new Mensaje.Aviso(actual.getNombre()
                     + (conMulta
                         ? " paga ₡" + Configuracion.MULTA_CARCEL + " y sale de la cárcel."
                         : " usa su carta y sale de la cárcel.")
@@ -1172,7 +1172,7 @@ public class GameServer {
             }
 
             if (error != null) {
-                escribir(out, new Message.Aviso(error));
+                escribir(out, new Mensaje.Aviso(error));
                 return;
             }
 
@@ -1197,13 +1197,13 @@ public class GameServer {
         yaTiro = false;
 
         if (!avisos.isEmpty()) {
-            difundir(new Message.Aviso(avisos));
+            difundir(new Mensaje.Aviso(avisos));
         }
 
         if (juego.esFinDeJuego()) {
-            difundir(new Message.Aviso(textoFinDePartida()));
+            difundir(new Mensaje.Aviso(textoFinDePartida()));
         } else {
-            difundir(new Message.Aviso(
+            difundir(new Mensaje.Aviso(
                     "Turno de "
                             + juego.getJugadorActual().getNombre()
                             + ". Tirá los dados en el cajero."
@@ -1268,14 +1268,14 @@ public class GameServer {
     // Foto de la partida que se manda a los clientes
     /** Consultar y exportar no cambian el juego y se permiten incluso al finalizar. */
     private void consultarTransacciones(int computadora, ObjectOutputStream out,
-            Message.ConsultarTransacciones consulta, boolean exportacion) throws IOException {
+            Mensaje.ConsultarTransacciones consulta, boolean exportacion) throws IOException {
         synchronized (gameLock) {
             boolean participante = false;
             for (int propietario : computadoraDe) {
                 if (propietario == computadora) participante = true;
             }
             if (juego == null || !participante) {
-                escribir(out, new Message.Aviso("No hay una partida disponible para consultar."));
+                escribir(out, new Mensaje.Aviso("No hay una partida disponible para consultar."));
                 return;
             }
             String jugador = consulta == null ? null : consulta.jugador();
@@ -1284,7 +1284,7 @@ public class GameServer {
                 try {
                     tipo = modelo.TipoTransaccion.valueOf(consulta.tipo());
                 } catch (IllegalArgumentException e) {
-                    escribir(out, new Message.Aviso("Tipo de transaccion desconocido."));
+                    escribir(out, new Mensaje.Aviso("Tipo de transaccion desconocido."));
                     return;
                 }
             }
@@ -1294,21 +1294,21 @@ public class GameServer {
                     if (registrado != null && registrado.getId().equals(jugador)) existe = true;
                 }
                 if (!existe) {
-                    escribir(out, new Message.Aviso("Jugador desconocido."));
+                    escribir(out, new Mensaje.Aviso("Jugador desconocido."));
                     return;
                 }
             }
             modelo.RegistroTransacciones registro = juego.getRegistroTransacciones();
             String texto = exportacion ? registro.exportar()
                     : registro.consultar(jugador, tipo, consulta.recientesPrimero());
-            escribir(out, new Message.HistorialTransacciones(texto,
+            escribir(out, new Mensaje.HistorialTransacciones(texto,
                     registro.getArchivo().getFileName().toString(), exportacion));
         }
     }
 
-    private Message.EstadoJuego crearEstado() {
+    private Mensaje.EstadoJuego crearEstado() {
         String errorHistorial = juego.getRegistroTransacciones().getErrorEscritura();
-        if (errorHistorial != null) difundir(new Message.Aviso(errorHistorial));
+        if (errorHistorial != null) difundir(new Mensaje.Aviso(errorHistorial));
 
         String[] nombres = new String[Configuracion.CANTIDAD_JUGADORES];
         int[] saldos = new int[Configuracion.CANTIDAD_JUGADORES];
@@ -1344,21 +1344,21 @@ public class GameServer {
                         && casillaActual instanceof Propiedad propiedad
                         && !propiedad.tienePropietario();
 
-        Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[tablero.tamaño()];
+        Mensaje.EstadoPropiedad[] propiedades = new Mensaje.EstadoPropiedad[tablero.tamaño()];
         for (int i = 0; i < tablero.tamaño(); i++) {
             if (tablero.obtenerCasilla(i) instanceof Propiedad p) {
                 int propietario = -1;
                 for (int j = 0; j < jugadores.length; j++) {
                     if (jugadores[j] == p.getPropietario()) propietario = j;
                 }
-                propiedades[i] = new Message.EstadoPropiedad(i, propietario, p.getCantidadCasas(),
+                propiedades[i] = new Mensaje.EstadoPropiedad(i, propietario, p.getCantidadCasas(),
                         p.tieneHotel(), p.estaHipotecada(), p.calcularAlquiler(), p.getPrecioCasa(),
                         juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), p), p.getPrecioHotel(),
                         juego.getBanco().motivoNoComprarHotel(juego.getJugadorActual(), p));
             }
         }
 
-        return new Message.EstadoJuego(
+        return new Mensaje.EstadoJuego(
                 juego.getTurnoActualGlobal(),
                 juego.getMaxTurnos(),
                 indiceEnTurno(),
@@ -1410,7 +1410,7 @@ public class GameServer {
                                     + socketCajero.getInetAddress()
                     );
 
-                    // 'this' es este GameServer: el manejador lo usa
+                    // 'this' es este Servidor: el manejador lo usa
                     // para avisar cuando lleguen dados o tarjetas
                     new Thread(
                             new ManejadorCajero(socketCajero, this)
@@ -1419,7 +1419,7 @@ public class GameServer {
 
             } catch (IOException e) {
 
-                // Tambien pasa al cerrar el servidor con stop(): es normal
+                // Tambien pasa al cerrar el servidor con detener(): es normal
                 System.out.println(
                         "Servidor del cajero detenido: "
                                 + e.getMessage()
@@ -1519,7 +1519,7 @@ public class GameServer {
                     return;
                 }
 
-                difundir(new Message.Aviso(
+                difundir(new Mensaje.Aviso(
                         "¡" + jugador.getNombre() + " pagó con su tarjeta y compró "
                                 + switch (compra) {
                                     case CASA -> "una casa en ";
@@ -1580,17 +1580,17 @@ public class GameServer {
                     accion.substring("RFID_REGISTRAR_".length())
             );
         } catch (Exception e) {
-            escribir(out, new Message.Aviso("__RFID_ERROR__;Solicitud RFID inválida."));
+            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;Solicitud RFID inválida."));
             return;
         }
 
         if (indiceLocal < 0 || indiceLocal > 1) {
-            escribir(out, new Message.Aviso("__RFID_ERROR__;Jugador RFID inválido."));
+            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;Jugador RFID inválido."));
             return;
         }
 
         if (buscarPartidaDeComputadora(computadora) == null) {
-            escribir(out, new Message.Aviso("__RFID_ERROR__;No hay una partida para registrar la tarjeta."));
+            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;No hay una partida para registrar la tarjeta."));
             return;
         }
 
@@ -1622,7 +1622,7 @@ public class GameServer {
     ) {
         if (computadora < 0 || computadora >= salidas.length || salidas[computadora] == null) return;
         try {
-            escribir(salidas[computadora], new Message.Aviso(
+            escribir(salidas[computadora], new Mensaje.Aviso(
                     "__RFID__;" + indiceLocal + ";" + correcta + ";" + uid + ";" + mensaje
             ));
         } catch (IOException e) {
@@ -1633,7 +1633,7 @@ public class GameServer {
     private void avisarComputadora(int computadora, String mensaje) {
         if (computadora < 0 || computadora >= salidas.length || salidas[computadora] == null) return;
         try {
-            escribir(salidas[computadora], new Message.Aviso(mensaje));
+            escribir(salidas[computadora], new Mensaje.Aviso(mensaje));
         } catch (IOException e) {
             System.out.println("No se pudo enviar aviso: " + e.getMessage());
         }
@@ -1644,13 +1644,13 @@ public class GameServer {
     // CERRAR SERVIDOR
     // =========================================================
 
-    public void stop()
+    public void detener()
             throws IOException {
 
-        if (serverSocket != null
-                && !serverSocket.isClosed()) {
+        if (socketJuego != null
+                && !socketJuego.isClosed()) {
 
-            serverSocket.close();
+            socketJuego.close();
         }
 
         if (servidorCajero != null
@@ -1659,7 +1659,7 @@ public class GameServer {
             servidorCajero.close();
         }
 
-        pool.shutdownNow();
+        hilosComputadoras.shutdownNow();
     }
 
 
@@ -1719,10 +1719,10 @@ public class GameServer {
 
         try {
 
-            GameServer servidor =
-                    new GameServer();
+            Servidor servidor =
+                    new Servidor();
 
-            servidor.start();
+            servidor.iniciar();
 
         } catch (IOException e) {
 

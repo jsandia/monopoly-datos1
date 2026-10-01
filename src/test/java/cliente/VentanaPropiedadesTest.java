@@ -1,7 +1,7 @@
 package cliente;
 
 import modelo.Tablero;
-import protocolo.Message;
+import protocolo.Mensaje;
 import org.junit.jupiter.api.Test;
 import javax.swing.*;
 import java.awt.Component;
@@ -9,8 +9,8 @@ import java.awt.Container;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VentanaPropiedadesTest {
-    private static Message.EstadoJuego estado(Message.EstadoPropiedad[] propiedades) {
-        return new Message.EstadoJuego(1, 100, 0, new String[]{"Ana", "José", "Luis", "María"},
+    private static Mensaje.EstadoJuego estado(Mensaje.EstadoPropiedad[] propiedades) {
+        return new Mensaje.EstadoJuego(1, 100, 0, new String[]{"Ana", "José", "Luis", "María"},
                 new int[]{1500, 1500, 1500, 1500}, new int[4], new int[]{0, 0, 1, 1},
                 false, false, false, new boolean[4], new int[4], propiedades, 32, 12,
                 new boolean[]{true, true, true, true}, new int[4], -1, false);
@@ -31,9 +31,9 @@ class VentanaPropiedadesTest {
         SwingUtilities.invokeAndWait(() -> {
             VentanaPropiedades ventana = new VentanaPropiedades(null, new Tablero());
             try {
-                Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[40];
-                propiedades[1] = new Message.EstadoPropiedad(1, 0, 2, false, false, 30, 50, null, 50, "Necesita cuatro casas.");
-                propiedades[3] = new Message.EstadoPropiedad(3, 1, 0, false, true, 0, 50, null, 50, "Propiedad hipotecada.");
+                Mensaje.EstadoPropiedad[] propiedades = new Mensaje.EstadoPropiedad[40];
+                propiedades[1] = new Mensaje.EstadoPropiedad(1, 0, 2, false, false, 30, 50, null, 50, "Necesita cuatro casas.");
+                propiedades[3] = new Mensaje.EstadoPropiedad(3, 1, 0, false, true, 0, 50, null, 50, "Propiedad hipotecada.");
                 ventana.actualizar(estado(propiedades));
                 JTabbedPane pestanas = buscar(ventana.getContentPane(), JTabbedPane.class);
                 assertEquals(4, pestanas.getTabCount());
@@ -56,11 +56,11 @@ class VentanaPropiedadesTest {
         SwingUtilities.invokeAndWait(() -> {
             VentanaPropiedades ventana = new VentanaPropiedades(null, new Tablero());
             try {
-                Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[40];
+                Mensaje.EstadoPropiedad[] propiedades = new Mensaje.EstadoPropiedad[40];
                 ventana.actualizar(estado(propiedades));
                 JTabbedPane pestanas = buscar(ventana.getContentPane(), JTabbedPane.class);
                 pestanas.setSelectedIndex(1);
-                propiedades[3] = new Message.EstadoPropiedad(3, 1, 3, false, false, 180, 50, null, 50, "Necesita cuatro casas.");
+                propiedades[3] = new Mensaje.EstadoPropiedad(3, 1, 3, false, false, 180, 50, null, 50, "Necesita cuatro casas.");
                 ventana.actualizar(estado(propiedades));
                 assertEquals(1, pestanas.getSelectedIndex());
                 assertEquals("José (1)", pestanas.getTitleAt(1));
@@ -68,7 +68,7 @@ class VentanaPropiedadesTest {
                 assertEquals("Cahuita", tabla.getValueAt(0, 0));
                 assertEquals(3, tabla.getValueAt(0, 2));
                 assertEquals("₡180", tabla.getValueAt(0, 4));
-                propiedades[3] = new Message.EstadoPropiedad(3, 1, 0, true, false, 450, 50,
+                propiedades[3] = new Mensaje.EstadoPropiedad(3, 1, 0, true, false, 450, 50,
                         "Ya tiene hotel.", 50, "Ya tiene hotel.");
                 ventana.actualizar(estado(propiedades));
                 tabla = buscar(pestanas.getComponentAt(1), JTable.class);

@@ -6,7 +6,7 @@ import modelo.CasillaEspecial;
 import modelo.CasillaEvento;
 import modelo.Propiedad;
 import modelo.Tablero;
-import protocolo.Message;
+import protocolo.Mensaje;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -55,7 +55,7 @@ public class VentanaTablero extends JFrame {
     private final JButton botonUsarCarta = new JButton("🃏 Usar carta \"Salga de la cárcel\"");
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
     private final JButton botonComprarCasa = new JButton("Comprar casas / hotel");
-    private Message.EstadoJuego ultimoEstado;
+    private Mensaje.EstadoJuego ultimoEstado;
     private final JButton botonPropiedades = new JButton("Propiedades de los jugadores");
     private VentanaPropiedades ventanaPropiedades;
     private Casilla casillaSeleccionada;
@@ -69,14 +69,14 @@ public class VentanaTablero extends JFrame {
     private Tablero modeloTablero; // solo para dibujar y mostrar el detalle de las casillas
 
     // --- Conexión con el servidor ---
-    private final int miComputadora;               // 0 o 1, el playerId que dio el servidor
-    private final Consumer<Message> enviar;        // manda una intención al servidor
+    private final int miComputadora;               // 0 o 1: el número que el servidor le dio a esta computadora
+    private final Consumer<Mensaje> enviar;        // manda una intención al servidor
     private boolean finMostrado = false;
 
     // --- Animación de los dados ---
     private final Random random = new Random();
     private Timer temporizadorDados;                // != null mientras los dados están girando
-    private Message.EstadoJuego estadoPendiente;    // estado que llegó mientras giraban
+    private Mensaje.EstadoJuego estadoPendiente;    // estado que llegó mientras giraban
 
     /** Solo para ver el tablero sin servidor (no se puede jugar). */
     public VentanaTablero() {
@@ -84,10 +84,10 @@ public class VentanaTablero extends JFrame {
     }
 
     /**
-     * @param miComputadora el playerId que el servidor le dio a esta computadora
-     * @param enviar        cómo mandar una intención al servidor (GameClient::enviarAccion)
+     * @param miComputadora el número (0 o 1) que el servidor le dio a esta computadora
+     * @param enviar        cómo mandar una intención al servidor (Cliente::enviarAccion)
      */
-    public VentanaTablero(int miComputadora, Consumer<Message> enviar) {
+    public VentanaTablero(int miComputadora, Consumer<Mensaje> enviar) {
         super("Monopoly Costa Rica — Tablero");
         setDefaultCloseOperation(EXIT_ON_CLOSE); // cerrar la ventana termina el programa
 
@@ -216,7 +216,7 @@ public class VentanaTablero extends JFrame {
         // getDescripcion() ejecuta la versión de la hija real (polimorfismo)
         areaDescripcion.setText(casilla.getDescripcion());
         if (casilla instanceof Propiedad p && ultimoEstado != null) {
-            Message.EstadoPropiedad estado = ultimoEstado.propiedades()[p.getId()];
+            Mensaje.EstadoPropiedad estado = ultimoEstado.propiedades()[p.getId()];
             if (estado != null) {
                 String propietario = estado.propietario() < 0 ? "Sin dueño" : ultimoEstado.nombres()[estado.propietario()];
                 areaDescripcion.setText("Grupo: " + p.getGrupo() + "\nPrecio: ₡" + p.getPrecio()
@@ -238,20 +238,20 @@ public class VentanaTablero extends JFrame {
 
     /**
      * Punto de entrada de todo lo que manda el servidor. Lo llama el hilo
-     * lector de GameClient, que NO es el hilo de Swing; por eso se pasa a
+     * lector de Cliente, que NO es el hilo de Swing; por eso se pasa a
      * Swing con invokeLater antes de tocar cualquier componente.
      */
-    public void recibirMensaje(Message mensaje) {
+    public void recibirMensaje(Mensaje mensaje) {
         SwingUtilities.invokeLater(() -> {
-            if (mensaje instanceof Message.Dados dados) {
+            if (mensaje instanceof Mensaje.Dados dados) {
                 animarDados(dados.dado1(), dados.dado2());
-            } else if (mensaje instanceof Message.Aviso aviso) {
+            } else if (mensaje instanceof Mensaje.Aviso aviso) {
                 registrarLog(aviso.texto());
-            } else if (mensaje instanceof Message.HistorialTransacciones historial) {
+            } else if (mensaje instanceof Mensaje.HistorialTransacciones historial) {
                 if (ventanaHistorial != null && ventanaHistorial.isDisplayable()) {
                     ventanaHistorial.recibir(historial);
                 }
-            } else if (mensaje instanceof Message.EstadoJuego estado) {
+            } else if (mensaje instanceof Mensaje.EstadoJuego estado) {
                 if (temporizadorDados != null) {
                     estadoPendiente = estado; // se aplica cuando los dados terminen de girar
                 } else {
@@ -302,7 +302,7 @@ public class VentanaTablero extends JFrame {
     }
 
     /** Pone la ventana igual a lo que dice el servidor. */
-    private void aplicarEstado(Message.EstadoJuego estado) {
+    private void aplicarEstado(Mensaje.EstadoJuego estado) {
         ultimoEstado = estado;
         botonPropiedades.setEnabled(true);
         if (ventanaPropiedades != null && ventanaPropiedades.isDisplayable()) {
@@ -371,7 +371,7 @@ public class VentanaTablero extends JFrame {
         botonLanzarDados.setEnabled(esMiTurno && !estado.yaTiro());
         botonComprar.setEnabled(esMiTurno && estado.puedeComprar());
         boolean tienePropiedadEdificable = false;
-        for (Message.EstadoPropiedad p : estado.propiedades()) {
+        for (Mensaje.EstadoPropiedad p : estado.propiedades()) {
             if (p != null && p.propietario() == enTurno && p.precioCasa() > 0) tienePropiedadEdificable = true;
         }
         botonComprarCasa.setEnabled(esMiTurno && tienePropiedadEdificable);
@@ -396,7 +396,7 @@ public class VentanaTablero extends JFrame {
     }
 
     /** Ganador y patrimonio de cada jugador (saldo + valor de sus propiedades). */
-    private static String textoFinal(Message.EstadoJuego estado) {
+    private static String textoFinal(Mensaje.EstadoJuego estado) {
         StringBuilder texto = new StringBuilder("¡La partida ha finalizado!\n\n");
         if (estado.ganador() >= 0) {
             texto.append("🏆 Gana ").append(estado.nombres()[estado.ganador()]);
@@ -434,25 +434,25 @@ public class VentanaTablero extends JFrame {
         // Solo mandan la intención. Lo que pase lo contesta el servidor.
         botonLanzarDados.addActionListener(e -> {
             botonLanzarDados.setEnabled(false); // evita doble clic mientras responde
-            enviar.accept(new Message.TirarDadosPrueba());
+            enviar.accept(new Mensaje.TirarDadosPrueba());
         });
         botonComprar.addActionListener(e -> {
             botonComprar.setEnabled(false);
-            enviar.accept(new Message.ComprarPropiedad());
+            enviar.accept(new Mensaje.ComprarPropiedad());
         });
         botonTerminarTurno.addActionListener(e -> {
             botonTerminarTurno.setEnabled(false);
-            enviar.accept(new Message.TerminarTurno());
+            enviar.accept(new Mensaje.TerminarTurno());
         });
         botonPagarMulta.addActionListener(e -> {
             botonPagarMulta.setEnabled(false);
             botonUsarCarta.setEnabled(false);
-            enviar.accept(new Message.PagarMultaCarcel());
+            enviar.accept(new Mensaje.PagarMultaCarcel());
         });
         botonUsarCarta.addActionListener(e -> {
             botonPagarMulta.setEnabled(false);
             botonUsarCarta.setEnabled(false);
-            enviar.accept(new Message.UsarCartaCarcel());
+            enviar.accept(new Mensaje.UsarCartaCarcel());
         });
     }
 
@@ -465,7 +465,7 @@ public class VentanaTablero extends JFrame {
     private void elegirPropiedadParaCasa() {
         if (ultimoEstado == null) return;
         javax.swing.JComboBox<OpcionCasa> opciones = new javax.swing.JComboBox<>();
-        for (Message.EstadoPropiedad p : ultimoEstado.propiedades()) {
+        for (Mensaje.EstadoPropiedad p : ultimoEstado.propiedades()) {
             if (p != null && p.propietario() == ultimoEstado.enTurno() && p.precioCasa() > 0) {
                 opciones.addItem(new OpcionCasa(p, modeloTablero.obtenerCasilla(p.id()).getNombre()));
             }
@@ -505,11 +505,11 @@ public class VentanaTablero extends JFrame {
             return;
         }
         botonComprarCasa.setEnabled(false);
-        enviar.accept(opcion.esHotel() ? new Message.ComprarHotel(opcion.estado().id())
-                : new Message.ComprarCasa(opcion.estado().id()));
+        enviar.accept(opcion.esHotel() ? new Mensaje.ComprarHotel(opcion.estado().id())
+                : new Mensaje.ComprarCasa(opcion.estado().id()));
     }
 
-    private record OpcionCasa(Message.EstadoPropiedad estado, String nombre) {
+    private record OpcionCasa(Mensaje.EstadoPropiedad estado, String nombre) {
         boolean esHotel() { return estado.casas() == 4 && !estado.hotel(); }
         String motivoNoComprar() { return esHotel() ? estado.motivoNoComprarHotel() : estado.motivoNoComprarCasa(); }
         @Override public String toString() {

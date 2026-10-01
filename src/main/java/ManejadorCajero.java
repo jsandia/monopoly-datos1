@@ -9,13 +9,13 @@ import java.net.Socket;
 //   HOLA;CAJERO        -> saludo al conectarse
 //   DADOS;d1;d2        -> tirada de dos dados
 //   TARJETA;UID        -> tarjeta RFID leida (UID en hexadecimal)
-// Cada dato que llega se le pasa a GameServer.
+// Cada dato que llega se le pasa a Servidor.
 public class ManejadorCajero implements Runnable {
 
     private final Socket socketCajero;
-    private final GameServer servidor;
+    private final Servidor servidor;
 
-    public ManejadorCajero(Socket socketCajero, GameServer servidor) {
+    public ManejadorCajero(Socket socketCajero, Servidor servidor) {
         this.socketCajero = socketCajero;
         this.servidor = servidor;
     }

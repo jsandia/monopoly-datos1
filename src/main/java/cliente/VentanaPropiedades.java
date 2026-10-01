@@ -2,7 +2,7 @@ package cliente;
 
 import modelo.Propiedad;
 import modelo.Tablero;
-import protocolo.Message;
+import protocolo.Mensaje;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -25,7 +25,7 @@ public final class VentanaPropiedades extends JDialog {
     }
 
     /** Actualiza también una ventana abierta cuando se compra una propiedad o una casa. */
-    public void actualizar(Message.EstadoJuego estado) {
+    public void actualizar(Mensaje.EstadoJuego estado) {
         int seleccion = jugadores.getSelectedIndex();
         jugadores.removeAll();
         for (int jugador = 0; jugador < estado.nombres().length; jugador++) {
@@ -33,7 +33,7 @@ public final class VentanaPropiedades extends JDialog {
                     new String[]{"Propiedad", "Grupo", "Casas", "Hotel", "Renta", "Hipotecada"}, 0) {
                 @Override public boolean isCellEditable(int fila, int columna) { return false; }
             };
-            for (Message.EstadoPropiedad p : estado.propiedades()) {
+            for (Mensaje.EstadoPropiedad p : estado.propiedades()) {
                 if (p != null && p.propietario() == jugador) {
                     Propiedad propiedad = (Propiedad) tablero.obtenerCasilla(p.id());
                     filas.addRow(new Object[]{propiedad.getNombre(), propiedad.getGrupo(), p.casas(),

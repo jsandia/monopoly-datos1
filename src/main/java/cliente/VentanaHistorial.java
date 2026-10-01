@@ -1,7 +1,7 @@
 package cliente;
 
 import modelo.TipoTransaccion;
-import protocolo.Message;
+import protocolo.Mensaje;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -29,9 +29,9 @@ public final class VentanaHistorial extends JDialog {
     private final JComboBox<String> tipo = new JComboBox<>();
     private final JComboBox<String> orden = new JComboBox<>(new String[]{"Mas antigua primero", "Mas reciente primero"});
     private final JTextArea texto = new JTextArea();
-    private final Consumer<Message> enviar;
+    private final Consumer<Mensaje> enviar;
 
-    public VentanaHistorial(JFrame ventana, String[] nombres, Consumer<Message> enviar) {
+    public VentanaHistorial(JFrame ventana, String[] nombres, Consumer<Mensaje> enviar) {
         super(ventana, "Historial de transacciones", false);
         this.enviar = enviar;
         jugador.addItem("Todos");
@@ -51,7 +51,7 @@ public final class VentanaHistorial extends JDialog {
         controles.add(consultar);
 
         JButton exportar = new JButton("Exportar toda la partida a TXT");
-        exportar.addActionListener(evento -> enviar.accept(new Message.ExportarTransacciones()));
+        exportar.addActionListener(evento -> enviar.accept(new Mensaje.ExportarTransacciones()));
         texto.setEditable(false);
         texto.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
         setLayout(new BorderLayout());
@@ -68,11 +68,11 @@ public final class VentanaHistorial extends JDialog {
         int indice = jugador.getSelectedIndex();
         String identificador = indice == 0 ? null : indice == 1 ? "BANCO" : "J" + (indice - 1);
         String tipoSeleccionado = tipo.getSelectedIndex() == 0 ? null : (String) tipo.getSelectedItem();
-        enviar.accept(new Message.ConsultarTransacciones(identificador, tipoSeleccionado,
+        enviar.accept(new Mensaje.ConsultarTransacciones(identificador, tipoSeleccionado,
                 orden.getSelectedIndex() == 1));
     }
 
-    public void recibir(Message.HistorialTransacciones respuesta) {
+    public void recibir(Mensaje.HistorialTransacciones respuesta) {
         if (!respuesta.exportacion()) {
             texto.setText(respuesta.texto());
             texto.setCaretPosition(0);

@@ -1,7 +1,7 @@
 import modelo.Juego;
 import modelo.Jugador;
 import modelo.Propiedad;
-import protocolo.Message;
+import protocolo.Mensaje;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,25 +11,25 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import static org.junit.jupiter.api.Assertions.*;
 
-class GameServerCasasTest {
-    private GameServer servidor;
+class ServidorCasasTest {
+    private Servidor servidor;
     private Juego juego;
     private Jugador ana;
     private ObjectOutputStream salida;
     private ByteArrayOutputStream bytes;
 
     private Object invocar(String nombre, Class<?>[] tipos, Object... argumentos) throws Exception {
-        Method metodo = GameServer.class.getDeclaredMethod(nombre, tipos);
+        Method metodo = Servidor.class.getDeclaredMethod(nombre, tipos);
         metodo.setAccessible(true);
         return metodo.invoke(servidor, argumentos);
     }
     private Object campo(String nombre) throws Exception {
-        Field campo = GameServer.class.getDeclaredField(nombre);
+        Field campo = Servidor.class.getDeclaredField(nombre);
         campo.setAccessible(true);
         return campo.get(servidor);
     }
     private void asignar(String nombre, Object valor) throws Exception {
-        Field campo = GameServer.class.getDeclaredField(nombre);
+        Field campo = Servidor.class.getDeclaredField(nombre);
         campo.setAccessible(true);
         campo.set(servidor, valor);
     }
@@ -39,7 +39,7 @@ class GameServerCasasTest {
     private Propiedad propiedad(int id) { return (Propiedad) juego.getTablero().obtenerCasilla(id); }
 
     @BeforeEach void preparar() throws Exception {
-        servidor = new GameServer();
+        servidor = new Servidor();
         juego = new Juego(20, 4, "TEST_CASAS_SERVIDOR", false);
         Jugador[] jugadores = (Jugador[]) campo("jugadores");
         int[] computadoras = (int[]) campo("computadoraDe");
@@ -75,7 +75,7 @@ class GameServerCasasTest {
         assertEquals(1, propiedad(1).getCantidadCasas());
         servidor.recibirTarjetaDelCajero("ABC0");
         assertEquals(antes - 50, ana.getSaldo());
-        Message.EstadoJuego estado = (Message.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
+        Mensaje.EstadoJuego estado = (Mensaje.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
         assertEquals(1, estado.propiedades()[1].casas());
         assertEquals(10, estado.propiedades()[1].renta());
         assertEquals(0, estado.propiedades()[1].propietario());
@@ -83,7 +83,7 @@ class GameServerCasasTest {
         ByteArrayOutputStream copia = new ByteArrayOutputStream();
         try (ObjectOutputStream out = new ObjectOutputStream(copia)) { out.writeObject(estado); }
         try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(copia.toByteArray()))) {
-            assertEquals(10, ((Message.EstadoJuego) in.readObject()).propiedades()[1].renta());
+            assertEquals(10, ((Mensaje.EstadoJuego) in.readObject()).propiedades()[1].renta());
         }
     }
 
@@ -120,7 +120,7 @@ class GameServerCasasTest {
         ana.registrarRecorrido(39);
         pedirCasa(0, 1);
         assertNull(campo("jugadorPendientePago"));
-        Message.EstadoJuego estado = (Message.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
+        Mensaje.EstadoJuego estado = (Mensaje.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
         assertTrue(estado.propiedades()[1].motivoNoComprarCasa().contains("1 casillas"));
         ana.registrarRecorrido(1);
         pedirCasa(0, 1);
@@ -151,7 +151,7 @@ class GameServerCasasTest {
         assertTrue(propiedad(1).tieneHotel());
         servidor.recibirTarjetaDelCajero("ABC0");
         assertEquals(saldo - 50, ana.getSaldo());
-        Message.EstadoJuego estado = (Message.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
+        Mensaje.EstadoJuego estado = (Mensaje.EstadoJuego) invocar("crearEstado", new Class<?>[0]);
         assertTrue(estado.propiedades()[1].hotel());
         assertEquals(0, estado.propiedades()[1].casas());
         assertEquals(250, estado.propiedades()[1].renta());
@@ -162,7 +162,7 @@ class GameServerCasasTest {
         ByteArrayOutputStream copia = new ByteArrayOutputStream();
         try (ObjectOutputStream out = new ObjectOutputStream(copia)) { out.writeObject(estado); }
         try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(copia.toByteArray()))) {
-            Message.EstadoJuego recibido = (Message.EstadoJuego) in.readObject();
+            Mensaje.EstadoJuego recibido = (Mensaje.EstadoJuego) in.readObject();
             assertTrue(recibido.propiedades()[1].hotel());
             assertEquals(250, recibido.propiedades()[1].renta());
         }

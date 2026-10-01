@@ -6,7 +6,7 @@ import modelo.CasillaEspecial;
 import modelo.CasillaEvento;
 import modelo.Propiedad;
 import modelo.Tablero;
-import protocolo.Message;
+import protocolo.Mensaje;
 
 import javax.swing.JPanel;
 import javax.swing.Timer;
@@ -43,9 +43,9 @@ public class PanelTablero extends JPanel {
     private static final Color RESALTADO = new Color(0xFFC107);
 
     private final Tablero tablero;
-    private Message.EstadoPropiedad[] propiedades = new Message.EstadoPropiedad[40];
+    private Mensaje.EstadoPropiedad[] propiedades = new Mensaje.EstadoPropiedad[40];
 
-    public void actualizarPropiedades(Message.EstadoPropiedad[] propiedades) {
+    public void actualizarPropiedades(Mensaje.EstadoPropiedad[] propiedades) {
         this.propiedades = propiedades.clone();
         repaint();
     }
@@ -384,7 +384,7 @@ public class PanelTablero extends JPanel {
 
     /** Casas verdes y hoteles rojos sobre la franja de color, mirando hacia el centro. */
     private void dibujarConstrucciones(Graphics2D g2, Propiedad propiedad, Rectangle r, Lado lado, int grosor) {
-        Message.EstadoPropiedad estado = propiedades[propiedad.getId()];
+        Mensaje.EstadoPropiedad estado = propiedades[propiedad.getId()];
         int casas = estado == null ? propiedad.getCantidadCasas() : estado.casas();
         boolean hotel = estado == null ? propiedad.tieneHotel() : estado.hotel();
         if (casas == 0 && !hotel) return;
@@ -433,7 +433,7 @@ public class PanelTablero extends JPanel {
     /** Segunda línea de la casilla: precio, renta, símbolo o monto. */
     private String detalleDe(Casilla casilla) {
         if (casilla instanceof Propiedad p) {
-            Message.EstadoPropiedad estado = propiedades[p.getId()];
+            Mensaje.EstadoPropiedad estado = propiedades[p.getId()];
             return estado != null && estado.propietario() >= 0 ? "Renta ₡" + estado.renta() : "₡" + p.getPrecio();
         }
         if (casilla instanceof CasillaEvento ev) return ev.getTipo() == CasillaEvento.Tipo.SUERTE ? "?" : "▣";

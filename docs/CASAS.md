@@ -40,7 +40,7 @@ cantidad de casas. Por ejemplo, Sixaola cobra ₡2 de base, ₡4 con el grupo co
 sin casas y ₡10, ₡30, ₡90 o ₡160 con una, dos, tres o cuatro casas. La propiedad
 hipotecada cobra cero. Cada compra y cada pago de renta se registra en el historial.
 
-El cliente envía `Message.ComprarCasa(idPropiedad)` o `Message.ComprarHotel(idPropiedad)`. El servidor valida el turno
+El cliente envía `Mensaje.ComprarCasa(idPropiedad)` o `Mensaje.ComprarHotel(idPropiedad)`. El servidor valida el turno
 y las reglas antes de solicitar el pago y vuelve a validarlas al leer la tarjeta.
 `EstadoJuego` incluye las propiedades con dueño, casas, hotel, hipoteca, renta,
 precios de casa y hotel y motivos que impiden construir, además de las existencias del banco.
@@ -55,7 +55,7 @@ servidor y se puede consultar incluso fuera del turno o al finalizar la partida.
 Se debe recompilar y reiniciar el servidor y ambos clientes porque cambió el
 mensaje de estado compartido.
 
-Pruebas: `CasasTest` verifica reglas y cobros, y `GameServerCasasTest` verifica
+Pruebas: `CasasTest` verifica reglas y cobros, y `ServidorCasasTest` verifica
 el pago con RFID, el turno y la serialización del estado.
 
 Referencia de reglas: [manual clásico de Hasbro](https://www.hasbro.com/common/instruct/Monopoly.pdf).

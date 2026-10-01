@@ -86,8 +86,9 @@ src/main/java/
 ├── modelo/        Jugador, Juego, Banco, Tablero, Casilla, Propiedad, CasillaEvento,
 │                  CasillaEspecial, CartaEvento, Transaccion, ... (package modelo;)
 ├── cliente/       PanelTablero, VentanaTablero, VentanaHistorial (package cliente;)
-├── protocolo/     Message (package protocolo;)
-└── (por defecto)  GameServer, GameClient, Interfaz, ManejadorCajero, Discovery, ...
+├── protocolo/     Mensaje (package protocolo;)
+└── (por defecto)  Servidor, Cliente, Interfaz, ManejadorCajero, Descubrimiento,
+                   PruebaConexion
 
 hardware/          MicroPython del Pico 2W
 docs/              PROTOCOLO.md, UML, documento técnico

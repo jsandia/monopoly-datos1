@@ -1,5 +1,5 @@
 import config.Configuracion;
-import protocolo.Message;
+import protocolo.Mensaje;
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.BlockingQueue;
@@ -7,7 +7,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-public class GameClient {
+public class Cliente {
 
     private Socket socket;
 
@@ -15,20 +15,20 @@ public class GameClient {
 
     private ObjectInputStream in;
 
-    private int playerId;
+    private int computadora;
 
-    // Las respuestas a registrar/login/crear/entrar. El hilo lector las
+    // Las respuestas a registrarse/iniciar sesión/crear/entrar. El hilo lector las
     // mete aquí y recibirRespuesta() las saca (espera si todavía no llegan).
-    private final BlockingQueue<Message.Response> respuestas =
+    private final BlockingQueue<Mensaje.Respuesta> respuestas =
             new LinkedBlockingQueue<>();
 
     // Quién recibe lo que el servidor manda por su cuenta (Dados, Aviso,
     // EstadoJuego). Es la ventana del tablero.
-    private Consumer<Message> oyente;
+    private Consumer<Mensaje> oyente;
 
     // El último estado recibido, por si llega antes de que la ventana
     // esté lista para escucharlo.
-    private Message.EstadoJuego ultimoEstado;
+    private Mensaje.EstadoJuego ultimoEstado;
 
 
     // =========================================================
@@ -38,10 +38,10 @@ public class GameClient {
     public void conectar()
             throws IOException, ClassNotFoundException {
 
-        Discovery.HostInfo host =
-                Discovery.discoverHost(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
+        Descubrimiento.InfoServidor servidor =
+                Descubrimiento.buscarServidor(Configuracion.TIEMPO_DESCUBRIMIENTO_MS);
 
-        if (host == null) {
+        if (servidor == null) {
 
             throw new IOException(
                     "No se encontró el servidor."
@@ -51,8 +51,8 @@ public class GameClient {
 
         socket =
                 new Socket(
-                        host.address(),
-                        host.port()
+                        servidor.direccion(),
+                        servidor.puerto()
                 );
 
 
@@ -74,14 +74,14 @@ public class GameClient {
                 in.readObject();
 
 
-        if (objeto instanceof Message.Welcome welcome) {
+        if (objeto instanceof Mensaje.Bienvenida bienvenida) {
 
-            playerId =
-                    welcome.playerId();
+            computadora =
+                    bienvenida.computadora();
 
             System.out.println(
                     "Conectado como computadora "
-                            + playerId
+                            + computadora
             );
         }
 
@@ -106,11 +106,11 @@ public class GameClient {
 
                     Object objeto = in.readObject();
 
-                    if (objeto instanceof Message.Response respuesta) {
+                    if (objeto instanceof Mensaje.Respuesta respuesta) {
 
                         respuestas.put(respuesta);
 
-                    } else if (objeto instanceof Message mensaje) {
+                    } else if (objeto instanceof Mensaje mensaje) {
 
                         entregar(mensaje);
                     }
@@ -131,10 +131,10 @@ public class GameClient {
     }
 
     private synchronized void entregar(
-            Message mensaje
+            Mensaje mensaje
     ) {
 
-        if (mensaje instanceof Message.EstadoJuego estado) {
+        if (mensaje instanceof Mensaje.EstadoJuego estado) {
             ultimoEstado = estado;
         }
 
@@ -145,7 +145,7 @@ public class GameClient {
 
     // Registra al oyente y, si ya había llegado un estado, se lo pasa de una vez
     public synchronized void setOyente(
-            Consumer<Message> oyente
+            Consumer<Mensaje> oyente
     ) {
 
         this.oyente = oyente;
@@ -163,7 +163,7 @@ public class GameClient {
     // Manda una intención (TirarDadosPrueba, ComprarPropiedad,
     // TerminarTurno). La respuesta llega después como Aviso/EstadoJuego.
     public void enviarAccion(
-            Message accion
+            Mensaje accion
     ) {
 
         try {
@@ -184,13 +184,13 @@ public class GameClient {
     // REGISTRAR
     // =========================================================
 
-    public Message.Response registrar(
+    public Mensaje.Respuesta registrar(
             String nombre
     )
             throws IOException, ClassNotFoundException {
 
         enviar(
-                new Message.Register(nombre)
+                new Mensaje.Registrarse(nombre)
         );
 
         return recibirRespuesta();
@@ -201,13 +201,13 @@ public class GameClient {
     // LOGIN
     // =========================================================
 
-    public Message.Response login(
+    public Mensaje.Respuesta iniciarSesion(
             String nombre
     )
             throws IOException, ClassNotFoundException {
 
         enviar(
-                new Message.Login(nombre)
+                new Mensaje.IniciarSesion(nombre)
         );
 
         return recibirRespuesta();
@@ -218,14 +218,14 @@ public class GameClient {
     // CREAR PARTIDA
     // =========================================================
 
-    public Message.Response crearPartida(
+    public Mensaje.Respuesta crearPartida(
             String jugador1,
             String jugador2
     )
             throws IOException, ClassNotFoundException {
 
         enviar(
-                new Message.CreateGame(
+                new Mensaje.CrearPartida(
                         jugador1,
                         jugador2
                 )
@@ -239,7 +239,7 @@ public class GameClient {
     // ENTRAR A PARTIDA
     // =========================================================
 
-    public Message.Response entrarPartida(
+    public Mensaje.Respuesta entrarPartida(
             String codigo,
             String jugador1,
             String jugador2
@@ -247,7 +247,7 @@ public class GameClient {
             throws IOException, ClassNotFoundException {
 
         enviar(
-                new Message.JoinGame(
+                new Mensaje.UnirsePartida(
                         codigo,
                         jugador1,
                         jugador2
@@ -264,7 +264,7 @@ public class GameClient {
 
     // synchronized: la interfaz puede mandar acciones desde varios lugares
     private synchronized void enviar(
-            Message mensaje
+            Mensaje mensaje
     ) throws IOException {
 
         out.writeObject(mensaje);
@@ -277,13 +277,13 @@ public class GameClient {
     // RECIBIR RESPUESTA
     // =========================================================
 
-    private Message.Response recibirRespuesta()
+    private Mensaje.Respuesta recibirRespuesta()
             throws IOException, ClassNotFoundException {
 
         try {
 
             // Ya no leemos del socket aquí: el hilo lector lo hace
-            Message.Response respuesta =
+            Mensaje.Respuesta respuesta =
                     respuestas.poll(10, TimeUnit.SECONDS);
 
             if (respuesta != null) {
@@ -305,9 +305,9 @@ public class GameClient {
     // GET PLAYER ID
     // =========================================================
 
-    public int getPlayerId() {
+    public int getNumeroComputadora() {
 
-        return playerId;
+        return computadora;
     }
 
 
@@ -315,7 +315,7 @@ public class GameClient {
     // CERRAR
     // =========================================================
 
-    public void close() {
+    public void cerrar() {
 
         try {
 
