@@ -149,7 +149,7 @@ class TransaccionesTest {
     void otrasOperacionesDelBancoTambienQuedanRegistradas() {
         Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100);
         assertTrue(banco.comprarPropiedad(ana, propiedad));
-        ana.mover(40, 40);
+        ana.registrarRecorrido(40);
         assertTrue(banco.comprarCasa(ana, propiedad));
         assertTrue(banco.venderCasa(ana, propiedad));
         assertTrue(banco.hipotecarPropiedad(ana, propiedad));

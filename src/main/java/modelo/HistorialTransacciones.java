@@ -1,11 +1,21 @@
 package modelo;
 
-import estructuras.ListaCircularDoble;
+import estructuras.ListaDoble;
 import estructuras.Nodo;
 
-/** Historial sobre la lista propia del proyecto, sin colecciones de Java. */
+/**
+ * Historial de transacciones de una partida, guardado en una ListaDoble.
+ *
+ * Por que ListaDoble: el enunciado pide recorrerlo desde la mas antigua y
+ * desde la mas reciente. La mas antigua es el primer nodo y se avanza con
+ * getSiguiente(); la mas reciente es el ultimo nodo y se retrocede con
+ * getAnterior(). Agregar al final es O(1).
+ *
+ * Los metodos de consulta devuelven arreglos con el resultado, pero el
+ * almacenamiento es siempre la lista enlazada.
+ */
 public final class HistorialTransacciones {
-    private final ListaCircularDoble<Transaccion> transacciones = new ListaCircularDoble<>();
+    private final ListaDoble<Transaccion> transacciones = new ListaDoble<>();
 
     public synchronized void agregar(Transaccion transaccion) {
         if (transaccion == null) throw new IllegalArgumentException("Transaccion requerida");
@@ -34,14 +44,22 @@ public final class HistorialTransacciones {
         return consultar(null, tipo, false);
     }
 
-    /** Los arreglos son resultados de consulta; el almacenamiento sigue siendo enlazado. */
+    /**
+     * Recorre la lista en el sentido pedido y se queda con las que cumplen
+     * los filtros. Un filtro en null significa "cualquiera".
+     *
+     * @param jugador          id del jugador que debe participar (origen o destino), o null
+     * @param tipo             tipo de transaccion, o null
+     * @param recientesPrimero true: desde el ultimo nodo con getAnterior();
+     *                         false: desde el primero con getSiguiente()
+     */
     public synchronized Transaccion[] consultar(String jugador, TipoTransaccion tipo, boolean recientesPrimero) {
         Transaccion[] coincidencias = new Transaccion[transacciones.tamaño()];
-        Nodo<Transaccion> actual = transacciones.getCabeza();
-        if (actual != null && recientesPrimero) actual = actual.getAnterior();
         int cantidad = 0;
-        // La lista es circular: el contador evita volver a procesar el primer nodo.
-        for (int i = 0; i < transacciones.tamaño(); i++) {
+
+        Nodo<Transaccion> actual = recientesPrimero ? transacciones.getUltimo() : transacciones.getPrimero();
+        // No es circular: el recorrido termina al llegar a null en cualquiera de los dos sentidos
+        while (actual != null) {
             Transaccion transaccion = actual.getDato();
             if ((jugador == null || transaccion.participaJugador(jugador))
                     && (tipo == null || transaccion.tipo() == tipo)) {
@@ -49,6 +67,7 @@ public final class HistorialTransacciones {
             }
             actual = recientesPrimero ? actual.getAnterior() : actual.getSiguiente();
         }
+
         Transaccion[] resultado = new Transaccion[cantidad];
         System.arraycopy(coincidencias, 0, resultado, 0, cantidad);
         return resultado;

@@ -84,14 +84,20 @@ public class Tablero {
         casillas.agregarAlFinal(propiedad);
     }
 
+    /**
+     * Revisa si un jugador es dueño de todas las propiedades de un grupo.
+     * Da una sola vuelta al tablero caminando por los nodos.
+     */
     public boolean tieneGrupoCompleto(Jugador jugador, String grupo) {
         if (jugador == null) return false;
         boolean encontrado = false;
+        Nodo<Casilla> actual = casillas.getCabeza();
         for (int i = 0; i < tamaño(); i++) {
-            if (obtenerCasilla(i) instanceof Propiedad p && p.getGrupo().equals(grupo)) {
+            if (actual.getDato() instanceof Propiedad p && p.getGrupo().equals(grupo)) {
                 encontrado = true;
                 if (p.getPropietario() != jugador) return false;
             }
+            actual = actual.getSiguiente();
         }
         return encontrado;
     }
@@ -125,12 +131,21 @@ public class Tablero {
      * @param indice posición en el tablero (0 = Salida)
      * @return el nodo de esa casilla, para seguir caminando con
      *         getSiguiente() o getAnterior() desde ahí
+     * @throws IndexOutOfBoundsException si la posición no existe
      */
     public Nodo<Casilla> obtenerNodo(int indice) {
-        Nodo<Casilla> actual = casillas.getCabeza();
-        for (int i = 0; i < indice; i++) {
-            actual = actual.getSiguiente();
-        }
-        return actual;
+        return casillas.obtenerNodo(indice);
+    }
+
+    /**
+     * Camina hacia atrás por los punteros {@code anterior}. Lo usan las
+     * cartas de "retroceda".
+     *
+     * @param desde nodo de partida
+     * @param pasos cuántas casillas retroceder
+     * @return el nodo donde se termina
+     */
+    public Nodo<Casilla> retroceder(Nodo<Casilla> desde, int pasos) {
+        return casillas.retroceder(desde, pasos);
     }
 }

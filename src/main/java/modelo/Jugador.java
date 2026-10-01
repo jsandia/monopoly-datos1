@@ -1,9 +1,15 @@
 package modelo;
 
+import estructuras.ListaSimple;
+import estructuras.NodoSimple;
+
 /**
  * Clase Jugador
  * Representa a cada participante dentro del juego.
  * Mantiene la informacion de saldo, posicion y sus propiedades.
+ *
+ * La posicion es solo el id de la casilla donde esta la ficha. Quien la
+ * mueve es Juego, caminando por los nodos del Tablero.
  */
 public class Jugador {
 
@@ -17,8 +23,9 @@ public class Jugador {
     // Tarjeta RFID asociada a este jugador.
     private String uidTarjeta;
 
-    // Lista enlazada propia para almacenar sus propiedades
-    private ListaPropiedades propiedades;
+    // Sus propiedades, en el orden en que las compro. ListaSimple porque
+    // solo se agrega, se recorre y, a lo sumo, se quita una.
+    private final ListaSimple<Propiedad> propiedades;
 
     // Carcel: si esta preso y cuantas veces ha tirado sin sacar dobles
     private boolean enCarcel;
@@ -36,7 +43,7 @@ public class Jugador {
         this.posicionActual = 0;
         this.activo = true;
         this.uidTarjeta = null;
-        this.propiedades = new ListaPropiedades();
+        this.propiedades = new ListaSimple<>();
     }
 
     // =========================================================
@@ -79,14 +86,21 @@ public class Jugador {
         return false;
     }
 
-    // Actualiza la posicion dentro del tablero
-    public void mover(int casillasAvanzar, int totalCasillasTablero) {
-        this.posicionActual = Math.floorMod(this.posicionActual + casillasAvanzar, totalCasillasTablero);
-        registrarMovimiento(casillasAvanzar);
-    }
-
-    void registrarMovimiento(int pasos) {
-        propiedades.registrarMovimiento(this, pasos);
+    /**
+     * Le cuenta a cada una de sus propiedades cuantas casillas camino, para
+     * la regla de "una vuelta desde la compra antes de construir". Juego lo
+     * llama al avanzar (pasos positivos) y al retroceder (negativos).
+     */
+    public void registrarRecorrido(int pasos) {
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            Propiedad propiedad = actual.getDato();
+            // Solo cuenta si sigue siendo suya: el recorrido de otro dueño no vale
+            if (propiedad.getPropietario() == this) {
+                propiedad.registrarMovimiento(pasos);
+            }
+            actual = actual.getSiguiente();
+        }
     }
 
     // =========================================================
@@ -152,28 +166,55 @@ public class Jugador {
         return total;
     }
 
-    // Agrega una propiedad comprada a su lista propia
+    // =========================================================
+    // PROPIEDADES (ListaSimple<Propiedad>)
+    // =========================================================
+
+    // Agrega una propiedad comprada al final de su lista, sin repetirla
     public void agregarPropiedad(Propiedad propiedad) {
-        if (propiedad != null) {
-            this.propiedades.insertar(propiedad);
+        if (propiedad != null && !propiedades.contiene(propiedad)) {
+            propiedades.agregarAlFinal(propiedad);
         }
     }
 
-    // Remueve una propiedad de su lista
+    // Quita una propiedad de su lista
     public void quitarPropiedad(Propiedad propiedad) {
-        if (propiedad != null) {
-            this.propiedades.eliminar(propiedad);
-        }
+        propiedades.eliminar(propiedad);
     }
 
-    // Retorna la lista enlazada de propiedades
-    public ListaPropiedades getPropiedades() {
-        return propiedades;
-    }
-
-    // Calcula el costo total de sus propiedades
+    // Suma el precio de compra de todas sus propiedades
     public int calcularValorPropiedades() {
-        return this.propiedades.obtenerValorTotal();
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            total += actual.getDato().getPrecioCompra();
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    // Total de casas en todas sus propiedades (para las cartas de reparaciones)
+    public int contarCasas() {
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            total += actual.getDato().getCantidadCasas();
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    // Cuantas de sus propiedades tienen hotel (para las cartas de reparaciones)
+    public int contarHoteles() {
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            if (actual.getDato().tieneHotel()) {
+                total++;
+            }
+            actual = actual.getSiguiente();
+        }
+        return total;
     }
 
     // Suma el dinero disponible mas el valor de las propiedades
@@ -183,7 +224,7 @@ public class Jugador {
 
     // Devuelve cuantas propiedades posee
     public int getCantidadPropiedades() {
-        return propiedades.getCantidad();
+        return propiedades.tamaño();
     }
 
     // Getters y Setters
