@@ -663,29 +663,14 @@ public class Interfaz {
         // Durante el registro, usamos el oyente normal que ya existía
         // en Cliente. Al abrir el tablero, abrirTablero() lo reemplaza.
         cliente.setOyente(mensaje -> {
-            if (!(mensaje instanceof Mensaje.Aviso aviso)) return;
+            if (!(mensaje instanceof Mensaje.ResultadoTarjeta resultado)) return;
 
-            String texto = aviso.texto();
-            if (texto == null || !texto.startsWith("__RFID__;")) return;
-
-            String[] partes = texto.split(";", 5);
-            if (partes.length < 5) return;
-
-            try {
-                int indiceLocal = Integer.parseInt(partes[1]);
-                boolean correcta = Boolean.parseBoolean(partes[2]);
-                String uid = partes[3];
-                String mensajeResultado = partes[4];
-
-                SwingUtilities.invokeLater(() -> {
-                    if (ventanaEscaneo != null) {
-                        ventanaEscaneo.tarjetaEscaneada(
-                                indiceLocal, correcta, uid, mensajeResultado
-                        );
-                    }
-                });
-            } catch (NumberFormatException ignored) {
-            }
+            // El oyente corre en el hilo lector del Cliente; Swing solo se toca desde su hilo
+            SwingUtilities.invokeLater(() -> {
+                if (ventanaEscaneo != null) {
+                    ventanaEscaneo.tarjetaEscaneada(resultado);
+                }
+            });
         });
 
         ventanaEscaneo.setVisible(true);
@@ -695,14 +680,7 @@ public class Interfaz {
     private static void solicitarTarjetaRFID(int indiceLocal) {
         if (cliente == null) return;
 
-        cliente.enviarAccion(
-                new Mensaje.PlayerMove(
-                        cliente.getNumeroComputadora(),
-                        0,
-                        0,
-                        "RFID_REGISTRAR_" + indiceLocal
-                )
-        );
+        cliente.enviarAccion(new Mensaje.RegistrarTarjeta(indiceLocal));
     }
 
 
@@ -1277,15 +1255,19 @@ public class Interfaz {
         // =========================================================
 
         public void tarjetaEscaneada(
-                int indiceLocal,
-                boolean correcta,
-                String uid,
-                String mensaje
+                Mensaje.ResultadoTarjeta resultado
         ) {
 
-            if (!correcta) {
-                etiquetaEstado.setText(mensaje);
-                solicitarTarjetaRFID(jugadorActual - 1);
+            int indiceLocal = resultado.jugadorLocal();
+            String uid = resultado.uid();
+
+            if (!resultado.registrada()) {
+                etiquetaEstado.setText(resultado.mensaje());
+                // Con uid: se leyó una tarjeta que no sirve, se pide otra.
+                // Sin uid: la solicitud falló; volver a pedir daría el mismo error.
+                if (uid != null) {
+                    solicitarTarjetaRFID(jugadorActual - 1);
+                }
                 return;
             }
 

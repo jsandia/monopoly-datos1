@@ -299,14 +299,11 @@ public class Servidor {
                 // REGISTRO DE TARJETA RFID
                 // =================================================
 
-                // Se reutiliza PlayerMove para pedir el registro de una tarjeta.
-                else if (mensaje instanceof Mensaje.PlayerMove movimiento
-                        && movimiento.action() != null
-                        && movimiento.action().startsWith("RFID_REGISTRAR_")) {
+                else if (mensaje instanceof Mensaje.RegistrarTarjeta registro) {
 
                     solicitarRegistroTarjeta(
                             computadora,
-                            movimiento.action(),
+                            registro.jugadorLocal(),
                             out
                     );
                 }
@@ -1548,7 +1545,8 @@ public class Servidor {
                                 : 2 + indiceLocal;
 
                 if (tarjetaUsadaEnPartida(partida, uid)) {
-                    enviarAvisoRFID(computadora, indiceLocal, false, uid,
+                    // Se sigue esperando: la computadora vuelve a pedir y se escanea otra
+                    enviarResultadoTarjeta(computadora, indiceLocal, false, uid,
                             "Esta tarjeta ya pertenece a otro jugador. Escanee otra.");
                     return;
                 }
@@ -1561,40 +1559,38 @@ public class Servidor {
 
                 jugadorLocalEsperandoTarjeta[computadora] = -1;
 
-                enviarAvisoRFID(computadora, indiceLocal, true, uid,
+                enviarResultadoTarjeta(computadora, indiceLocal, true, uid,
                         "Tarjeta registrada correctamente.");
                 return;
             }
         }
     }
 
+    // Una computadora avisa que la próxima tarjeta que lea el cajero es de
+    // su jugador local (0 o 1). Si la solicitud no se puede atender, se le
+    // contesta de una vez con un ResultadoTarjeta sin uid.
     private void solicitarRegistroTarjeta(
             int computadora,
-            String accion,
+            int indiceLocal,
             ObjectOutputStream out
     ) throws IOException {
 
-        int indiceLocal;
-        try {
-            indiceLocal = Integer.parseInt(
-                    accion.substring("RFID_REGISTRAR_".length())
-            );
-        } catch (Exception e) {
-            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;Solicitud RFID inválida."));
-            return;
-        }
+        synchronized (gameLock) {
 
-        if (indiceLocal < 0 || indiceLocal > 1) {
-            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;Jugador RFID inválido."));
-            return;
-        }
+            String error = null;
+            if (indiceLocal < 0 || indiceLocal > 1) {
+                error = "Jugador RFID inválido.";
+            } else if (buscarPartidaDeComputadora(computadora) == null) {
+                error = "No hay una partida para registrar la tarjeta.";
+            }
 
-        if (buscarPartidaDeComputadora(computadora) == null) {
-            escribir(out, new Mensaje.Aviso("__RFID_ERROR__;No hay una partida para registrar la tarjeta."));
-            return;
-        }
+            if (error != null) {
+                escribir(out, new Mensaje.ResultadoTarjeta(indiceLocal, false, null, error));
+                return;
+            }
 
-        jugadorLocalEsperandoTarjeta[computadora] = indiceLocal;
+            jugadorLocalEsperandoTarjeta[computadora] = indiceLocal;
+        }
     }
 
     private Partida buscarPartidaDeComputadora(int computadora) {
@@ -1616,15 +1612,14 @@ public class Servidor {
         return false;
     }
 
-    private void enviarAvisoRFID(
-            int computadora, int indiceLocal, boolean correcta,
+    private void enviarResultadoTarjeta(
+            int computadora, int indiceLocal, boolean registrada,
             String uid, String mensaje
     ) {
         if (computadora < 0 || computadora >= salidas.length || salidas[computadora] == null) return;
         try {
-            escribir(salidas[computadora], new Mensaje.Aviso(
-                    "__RFID__;" + indiceLocal + ";" + correcta + ";" + uid + ";" + mensaje
-            ));
+            escribir(salidas[computadora],
+                    new Mensaje.ResultadoTarjeta(indiceLocal, registrada, uid, mensaje));
         } catch (IOException e) {
             System.out.println("No se pudo enviar confirmación RFID: " + e.getMessage());
         }

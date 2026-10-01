@@ -20,7 +20,6 @@ import java.io.Serializable;
  */
 public sealed interface Mensaje extends Serializable
         permits Mensaje.Bienvenida,
-        Mensaje.PlayerMove,
         Mensaje.Ping,
         Mensaje.Pong,
         Mensaje.Registrarse,
@@ -28,6 +27,8 @@ public sealed interface Mensaje extends Serializable
         Mensaje.CrearPartida,
         Mensaje.UnirsePartida,
         Mensaje.Respuesta,
+        Mensaje.RegistrarTarjeta,
+        Mensaje.ResultadoTarjeta,
         Mensaje.TirarDadosPrueba,
         Mensaje.ComprarPropiedad,
         Mensaje.ComprarCasa,
@@ -47,13 +48,6 @@ public sealed interface Mensaje extends Serializable
     // =========================================================
 
     record Bienvenida(int computadora) implements Mensaje {}
-
-    record PlayerMove(
-            int computadora,
-            double x,
-            double y,
-            String action
-    ) implements Mensaje {}
 
     record Ping(long enviadoMs) implements Mensaje {}
 
@@ -97,6 +91,28 @@ public sealed interface Mensaje extends Serializable
             String tipo,
             String mensaje
     ) implements Mensaje {}
+
+
+    // =========================================================
+    // REGISTRO DE TARJETAS RFID (antes de jugar)
+    // =========================================================
+
+    /**
+     * Cliente → servidor: "el próximo UID que lea el cajero es de mi
+     * jugador local N" (0 = el primero de esta computadora, 1 = el segundo).
+     */
+    record RegistrarTarjeta(int jugadorLocal) implements Mensaje {}
+
+    /**
+     * Servidor → la computadora que pidió el registro.
+     * registrada = true: la tarjeta quedó asociada al jugador.
+     * registrada = false con uid: se leyó una tarjeta que no sirve
+     *   (por ejemplo, ya es de otro jugador); el servidor sigue esperando otra.
+     * registrada = false con uid null: la solicitud misma no se pudo
+     *   atender (por ejemplo, no hay partida); no hay nada que esperar.
+     */
+    record ResultadoTarjeta(int jugadorLocal, boolean registrada, String uid, String mensaje)
+            implements Mensaje {}
 
 
     // =========================================================
