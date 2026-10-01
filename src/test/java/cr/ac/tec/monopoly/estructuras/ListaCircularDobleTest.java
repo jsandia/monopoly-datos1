@@ -104,6 +104,142 @@ class ListaCircularDobleTest {
     void eliminarInexistenteDevuelveFalse() {
         ListaCircularDoble<String> lista = listaABC();
         assertFalse(lista.eliminar("X"));
+        assertFalse(lista.eliminar(null));
         assertEquals(3, lista.tamaño());
+    }
+
+    @Test
+    void eliminarEnVaciaDevuelveFalse() {
+        assertFalse(new ListaCircularDoble<String>().eliminar("A"));
+    }
+
+    @Test
+    void noAceptaNull() {
+        ListaCircularDoble<String> lista = new ListaCircularDoble<>();
+        assertThrows(IllegalArgumentException.class, () -> lista.agregarAlFinal(null));
+        assertThrows(IllegalArgumentException.class, () -> lista.agregarAlInicio(null));
+        assertThrows(IllegalArgumentException.class, () -> lista.insertarEn(0, null));
+        assertTrue(lista.estaVacia());
+    }
+
+    @Test
+    void toStringInversoUsaLosPunterosAnterior() {
+        ListaCircularDoble<String> lista = listaABC();
+        assertEquals("[A, B, C]", lista.toString());
+        assertEquals("[C, B, A]", lista.toStringInverso());
+        assertEquals("[]", new ListaCircularDoble<String>().toStringInverso());
+    }
+
+    @Test
+    void insertarEnElMedio() {
+        ListaCircularDoble<String> lista = listaABC();
+        lista.insertarEn(1, "X");
+        assertEquals("[A, X, B, C]", lista.toString());
+        assertEquals("[C, B, X, A]", lista.toStringInverso());
+        assertEquals(4, lista.tamaño());
+    }
+
+    @Test
+    void insertarEnLosExtremos() {
+        ListaCircularDoble<String> lista = listaABC();
+        lista.insertarEn(0, "Inicio");
+        lista.insertarEn(lista.tamaño(), "Fin");
+        assertEquals("[Inicio, A, B, C, Fin]", lista.toString());
+        assertEquals("Inicio", lista.getCabeza().getDato());
+        assertEquals("Fin", lista.getCabeza().getAnterior().getDato());
+    }
+
+    @Test
+    void insertarEnVacia() {
+        ListaCircularDoble<String> lista = new ListaCircularDoble<>();
+        lista.insertarEn(0, "A");
+        assertEquals("[A]", lista.toString());
+        assertSame(lista.getCabeza(), lista.getCabeza().getSiguiente());
+    }
+
+    @Test
+    void insertarFueraDeRangoLanzaExcepcion() {
+        ListaCircularDoble<String> lista = listaABC();
+        assertThrows(IndexOutOfBoundsException.class, () -> lista.insertarEn(4, "X"));
+        assertThrows(IndexOutOfBoundsException.class, () -> lista.insertarEn(-1, "X"));
+        assertEquals(3, lista.tamaño());
+    }
+
+    @Test
+    void eliminarEnDevuelveElDato() {
+        ListaCircularDoble<String> lista = listaABC();
+        assertEquals("C", lista.eliminarEn(2));
+        assertEquals("A", lista.eliminarEn(0));
+        assertEquals("[B]", lista.toString());
+        assertSame(lista.getCabeza(), lista.getCabeza().getAnterior());
+        assertThrows(IndexOutOfBoundsException.class, () -> lista.eliminarEn(1));
+    }
+
+    @Test
+    void elNodoBorradoQuedaSuelto() {
+        ListaCircularDoble<String> lista = listaABC();
+        Nodo<String> b = lista.obtenerNodo(1);
+        lista.eliminar("B");
+        assertNull(b.getSiguiente());
+        assertNull(b.getAnterior());
+    }
+
+    @Test
+    void indiceDeYContiene() {
+        ListaCircularDoble<String> lista = listaABC();
+        assertEquals(2, lista.indiceDe("C"));
+        assertEquals(-1, lista.indiceDe("X"));
+        assertEquals(-1, lista.indiceDe(null));
+        assertTrue(lista.contiene("B"));
+        assertFalse(lista.contiene("X"));
+    }
+
+    @Test
+    void obtenerNodoDesdeAmbosLados() {
+        ListaCircularDoble<String> lista = listaABC();
+        lista.agregarAlFinal("D");
+        lista.agregarAlFinal("E");
+        // 0, 1 y 2 avanzan desde la cabeza; 3 y 4 retroceden desde ella
+        for (int i = 0; i < lista.tamaño(); i++) {
+            assertEquals(String.valueOf((char) ('A' + i)), lista.obtenerNodo(i).getDato());
+        }
+        assertThrows(IndexOutOfBoundsException.class, () -> lista.obtenerNodo(5));
+    }
+
+    @Test
+    void avanzarDaLaVuelta() {
+        ListaCircularDoble<String> lista = listaABC();
+        Nodo<String> c = lista.obtenerNodo(2);
+        assertEquals("A", lista.avanzar(c, 1).getDato());
+        assertEquals("B", lista.avanzar(c, 2).getDato());
+        assertSame(c, lista.avanzar(c, 3));
+        assertSame(c, lista.avanzar(c, 0));
+    }
+
+    @Test
+    void retrocederDaLaVuelta() {
+        ListaCircularDoble<String> lista = listaABC();
+        Nodo<String> a = lista.getCabeza();
+        assertEquals("C", lista.retroceder(a, 1).getDato());
+        assertEquals("B", lista.retroceder(a, 2).getDato());
+        assertSame(a, lista.retroceder(a, 3));
+    }
+
+    @Test
+    void moverseConDatosInvalidosLanzaExcepcion() {
+        ListaCircularDoble<String> lista = listaABC();
+        assertThrows(IllegalArgumentException.class, () -> lista.avanzar(null, 1));
+        assertThrows(IllegalArgumentException.class, () -> lista.avanzar(lista.getCabeza(), -1));
+        assertThrows(IllegalArgumentException.class, () -> lista.retroceder(lista.getCabeza(), -1));
+    }
+
+    @Test
+    void vaciarYReusar() {
+        ListaCircularDoble<String> lista = listaABC();
+        lista.vaciar();
+        assertTrue(lista.estaVacia());
+        assertNull(lista.getCabeza());
+        lista.agregarAlFinal("X");
+        assertEquals("[X]", lista.toString());
     }
 }

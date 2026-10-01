@@ -1,10 +1,18 @@
 package estructuras;
 
 /**
- * Nodo de una lista doblemente enlazada.
- * Guarda un dato y dos referencias: al nodo siguiente y al nodo anterior.
+ * Nodo de una lista doblemente enlazada: guarda un dato y dos referencias,
+ * al nodo siguiente y al nodo anterior.
  *
- * @param <T> tipo del dato que guarda el nodo (Casilla, Jugador, etc.)
+ * <pre>
+ *   ◄── anterior ──[ dato ]── siguiente ──►
+ * </pre>
+ *
+ * <p>Lo usan {@link ListaDoble} (donde los extremos apuntan a {@code null})
+ * y {@link ListaCircularDoble} (donde nunca hay {@code null}: el último
+ * apunta al primero y viceversa).</p>
+ *
+ * @param <T> tipo del dato que guarda el nodo (Casilla, Transaccion, etc.)
  */
 public class Nodo<T> {
 
@@ -24,26 +32,32 @@ public class Nodo<T> {
         this.anterior = null;
     }
 
+    /** @return el dato guardado en este nodo */
     public T getDato() {
         return dato;
     }
 
+    /** @param dato el nuevo dato para este nodo */
     public void setDato(T dato) {
         this.dato = dato;
     }
 
+    /** @return el nodo siguiente ({@code null} solo en una lista no circular) */
     public Nodo<T> getSiguiente() {
         return siguiente;
     }
 
+    /** @param siguiente el nodo al que debe apuntar hacia adelante */
     public void setSiguiente(Nodo<T> siguiente) {
         this.siguiente = siguiente;
     }
 
+    /** @return el nodo anterior ({@code null} solo en una lista no circular) */
     public Nodo<T> getAnterior() {
         return anterior;
     }
 
+    /** @param anterior el nodo al que debe apuntar hacia atrás */
     public void setAnterior(Nodo<T> anterior) {
         this.anterior = anterior;
     }
