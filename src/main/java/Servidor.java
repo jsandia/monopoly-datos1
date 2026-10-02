@@ -28,10 +28,6 @@ public class Servidor {
 
     private final int puerto;
 
-    private ServerSocket socketJuego;
-
-    private ServerSocket servidorCajero;
-
     private final ExecutorService hilosComputadoras =
             Executors.newFixedThreadPool(4);
 
@@ -118,7 +114,7 @@ public class Servidor {
 
     public void iniciar() throws IOException {
 
-        socketJuego =
+        ServerSocket socketJuego =
                 new ServerSocket(puerto);
 
         System.out.println(
@@ -237,60 +233,6 @@ public class Servidor {
                 out,
                 "REGISTER_OK",
                 "Usuario registrado correctamente."
-        );
-    }
-
-
-    // =========================================================
-    // LOGIN
-    // =========================================================
-
-    void iniciarSesion(
-            String nombre,
-            ObjectOutputStream out
-    ) throws IOException {
-
-        nombre =
-                nombre.trim();
-
-        if (nombre.isEmpty()) {
-
-            enviarRespuesta(
-                    out,
-                    "ERROR",
-                    "Debes escribir un nombre."
-            );
-
-            return;
-        }
-
-        String nombreFinal =
-                nombre;
-
-        boolean existe =
-                usuarios.stream()
-                        .anyMatch(
-                                usuario ->
-                                        usuario.equalsIgnoreCase(
-                                                nombreFinal
-                                        )
-                        );
-
-        if (!existe) {
-
-            enviarRespuesta(
-                    out,
-                    "USER_NOT_FOUND",
-                    "El usuario no está registrado."
-            );
-
-            return;
-        }
-
-        enviarRespuesta(
-                out,
-                "LOGIN_OK",
-                "Inicio de sesión correcto."
         );
     }
 
@@ -1213,7 +1155,7 @@ public class Servidor {
                     if (jugadores[j] == p.getPropietario()) propietario = j;
                 }
                 propiedades[i] = new Mensaje.EstadoPropiedad(i, propietario, p.getCantidadCasas(),
-                        p.tieneHotel(), p.estaHipotecada(), p.calcularAlquiler(), p.getPrecioCasa(),
+                        p.tieneHotel(), p.calcularAlquiler(), p.getPrecioCasa(),
                         juego.getBanco().motivoNoComprarCasa(juego.getJugadorActual(), p), p.getPrecioHotel(),
                         juego.getBanco().motivoNoComprarHotel(juego.getJugadorActual(), p));
             }
@@ -1266,7 +1208,7 @@ public class Servidor {
 
             try {
 
-                servidorCajero = new ServerSocket(Configuracion.PUERTO_CAJERO);
+                ServerSocket servidorCajero = new ServerSocket(Configuracion.PUERTO_CAJERO);
 
                 System.out.println(
                         "Esperando al cajero en el puerto "
@@ -1291,7 +1233,7 @@ public class Servidor {
 
             } catch (IOException e) {
 
-                // Tambien pasa al cerrar el servidor con detener(): es normal
+                // Por ejemplo, si el puerto del cajero ya está ocupado
                 System.out.println(
                         "Servidor del cajero detenido: "
                                 + e.getMessage()
@@ -1405,7 +1347,7 @@ public class Servidor {
                         || !switch (compra) {
                             case CASA -> juego.getBanco().comprarCasa(jugador, propiedad);
                             case HOTEL -> juego.getBanco().comprarHotel(jugador, propiedad);
-                            case PROPIEDAD -> juego.getBanco().comprarPropiedadConTarjeta(jugador, propiedad, uid);
+                            case PROPIEDAD -> juego.getBanco().comprarPropiedad(jugador, propiedad);
                         }) {
                     avisarComputadora(computadora, "No se pudo realizar el pago.");
                     difundir(crearEstado());
@@ -1530,28 +1472,6 @@ public class Servidor {
         }
     }
 
-
-    // =========================================================
-    // CERRAR SERVIDOR
-    // =========================================================
-
-    public void detener()
-            throws IOException {
-
-        if (socketJuego != null
-                && !socketJuego.isClosed()) {
-
-            socketJuego.close();
-        }
-
-        if (servidorCajero != null
-                && !servidorCajero.isClosed()) {
-
-            servidorCajero.close();
-        }
-
-        hilosComputadoras.shutdownNow();
-    }
 
 
     // =========================================================

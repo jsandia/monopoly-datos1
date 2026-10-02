@@ -66,9 +66,8 @@ class CasasTest {
         assertTrue(banco.comprarCasa(ana, propiedad(1))); // Una vuelta cumplida sigue habilitada.
     }
 
-    @Test void hipotecaDeOtraPropiedadNoImpideConstruirYCambioDeDuenoReiniciaEspera() {
+    @Test void cambioDeDuenoReiniciaLaEspera() {
         comprarGrupoCafe();
-        assertTrue(propiedad(3).hipotecar());
         assertTrue(banco.comprarCasa(ana, propiedad(1)));
         propiedad(1).setPropietario(jose);
         jose.agregarPropiedad(propiedad(1));
@@ -119,13 +118,9 @@ class CasasTest {
         assertEquals(4, registro.getHistorial().buscarPorTipo(TipoTransaccion.PAGO_ALQUILER).length);
     }
 
-    @Test void rechazaAjenaHipotecaSaldoInsuficienteYSinExistencias() {
+    @Test void rechazaAjenaSaldoInsuficienteYSinExistencias() {
         comprarGrupoCafe();
         assertFalse(banco.comprarCasa(jose, propiedad(1)));
-        assertTrue(propiedad(1).hipotecar());
-        assertFalse(banco.comprarCasa(ana, propiedad(1)));
-        assertEquals(0, propiedad(1).calcularAlquiler());
-        assertTrue(propiedad(1).quitarHipoteca());
         ana.setSaldo(49);
         assertFalse(banco.comprarCasa(ana, propiedad(1)));
         assertEquals(49, ana.getSaldo());

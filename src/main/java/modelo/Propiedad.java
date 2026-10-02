@@ -2,7 +2,7 @@ package modelo;
 import config.Configuracion;
 
 /**
- * Casilla que se puede comprar, administrar casas/hoteles e hipotecar.
+ * Casilla que se puede comprar y en la que se construyen casas y hoteles.
  * Hereda de Casilla para encajar en el Tablero de la GUI,
  * e incluye toda la logica financiera para funcionar con el Banco.
  */
@@ -20,11 +20,9 @@ public class Propiedad extends Casilla {
     private Jugador propietario;
     private int casas;
     private boolean tieneHotel;
-    private boolean hipotecada;
 
     private int precioCasa;
     private int precioHotel;
-    private int valorHipoteca;
 
     public Propiedad(int id, String nombre, String grupo, int precio, int alquiler) {
         super(id, nombre);
@@ -34,7 +32,6 @@ public class Propiedad extends Casilla {
         this.propietario = null;
         this.casas = 0;
         this.tieneHotel = false;
-        this.hipotecada = false;
 
         this.alquileresConstrucciones = alquileresClasicos(alquiler);
         this.precioCasa = switch (grupo) {
@@ -46,7 +43,6 @@ public class Propiedad extends Casilla {
             default -> precio / 2;
         };
         this.precioHotel = precioCasa;
-        this.valorHipoteca = precio / 2;
     }
 
     // --- GETTERS BASICOS ---
@@ -93,7 +89,6 @@ public class Propiedad extends Casilla {
 
     // --- ALQUILER ---
     public int calcularAlquiler() {
-        if (hipotecada) return 0;
         if (tieneHotel) return alquileresConstrucciones[4];
         if (casas > 0) return alquileresConstrucciones[casas - 1];
         if (esEdificable() && tablero != null && tablero.tieneGrupoCompleto(propietario, grupo)) {
@@ -137,7 +132,6 @@ public class Propiedad extends Casilla {
     public String motivoNoConstruir(Jugador jugador) {
         if (jugador == null || propietario != jugador) return "La propiedad no pertenece al jugador en turno.";
         if (!esEdificable()) return "No se construyen casas en transportes ni servicios.";
-        if (hipotecada) return "La propiedad está hipotecada.";
         if (tieneHotel || casas >= Configuracion.MAX_CASAS_POR_PROPIEDAD) return "La propiedad ya tiene el máximo de casas o un hotel.";
         if (!vueltaDesdeCompraCompletada) {
             int longitudVuelta = tablero == null ? Configuracion.CASILLAS_TABLERO : tablero.tamaño();
@@ -157,16 +151,8 @@ public class Propiedad extends Casilla {
     }
 
     public boolean agregarCasa() {
-        if (esEdificable() && !hipotecada && casas < Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
+        if (esEdificable() && casas < Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
             casas++;
-            return true;
-        }
-        return false;
-    }
-
-    public boolean quitarCasa() {
-        if (casas > 0) {
-            casas--;
             return true;
         }
         return false;
@@ -181,7 +167,7 @@ public class Propiedad extends Casilla {
     }
 
     public boolean construirHotel() {
-        if (esEdificable() && !hipotecada && casas == Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
+        if (esEdificable() && casas == Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
             casas = 0;
             tieneHotel = true;
             return true;
@@ -189,50 +175,15 @@ public class Propiedad extends Casilla {
         return false;
     }
 
-    public boolean quitarHotel() {
-        if (tieneHotel) {
-            tieneHotel = false;
-            casas = Configuracion.MAX_CASAS_POR_PROPIEDAD;
-            return true;
-        }
-        return false;
-    }
-
     /**
      * Deja la propiedad como al inicio de la partida: sin dueño, sin casas,
-     * sin hotel y sin hipoteca. Se usa cuando su dueño queda en bancarrota.
+     * sin hotel. Se usa cuando su dueño queda en bancarrota.
      * Las casas y el hotel los recupera el Banco antes de llamar a esto.
      */
     void devolverAlBanco() {
         setPropietario(null);
         casas = 0;
         tieneHotel = false;
-        hipotecada = false;
-    }
-
-    // --- HIPOTECA ---
-    public boolean estaHipotecada() {
-        return hipotecada;
-    }
-
-    public int getValorHipoteca() {
-        return valorHipoteca;
-    }
-
-    public boolean hipotecar() {
-        if (!hipotecada && casas == 0 && !tieneHotel) {
-            hipotecada = true;
-            return true;
-        }
-        return false;
-    }
-
-    public boolean quitarHipoteca() {
-        if (hipotecada) {
-            hipotecada = false;
-            return true;
-        }
-        return false;
     }
 
     @Override

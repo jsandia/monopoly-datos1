@@ -49,11 +49,6 @@ public class Juego {
     private final Dado dado1 = new Dado();
     private final Dado dado2 = new Dado();
 
-    // Constructor que inicializa el juego con limite de turnos y la cantidad de jugadores
-    public Juego(int maxTurnos, int cantidadJugadores) {
-        this(maxTurnos, cantidadJugadores, "local");
-    }
-
     public Juego(int maxTurnos, int cantidadJugadores, String codigoPartida) {
         this(maxTurnos, cantidadJugadores, codigoPartida, true);
     }
@@ -293,7 +288,7 @@ public class Juego {
 
         if (casilla instanceof Propiedad propiedad) {
             Jugador propietario = propiedad.getPropietario();
-            if (propietario == null || propietario == jugador || propiedad.estaHipotecada()) {
+            if (propietario == null || propietario == jugador) {
                 return;
             }
 

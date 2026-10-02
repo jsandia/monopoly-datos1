@@ -30,14 +30,14 @@ public final class VentanaPropiedades extends JDialog {
         jugadores.removeAll();
         for (int jugador = 0; jugador < estado.nombres().length; jugador++) {
             DefaultTableModel filas = new DefaultTableModel(
-                    new String[]{"Propiedad", "Grupo", "Casas", "Hotel", "Renta", "Hipotecada"}, 0) {
+                    new String[]{"Propiedad", "Grupo", "Casas", "Hotel", "Renta"}, 0) {
                 @Override public boolean isCellEditable(int fila, int columna) { return false; }
             };
             for (Mensaje.EstadoPropiedad p : estado.propiedades()) {
                 if (p != null && p.propietario() == jugador) {
                     Propiedad propiedad = (Propiedad) tablero.obtenerCasilla(p.id());
                     filas.addRow(new Object[]{propiedad.getNombre(), propiedad.getGrupo(), p.casas(),
-                            p.hotel() ? "Sí" : "No", "₡" + p.renta(), p.hipotecada() ? "Sí" : "No"});
+                            p.hotel() ? "Sí" : "No", "₡" + p.renta()});
                 }
             }
             JTable tabla = new JTable(filas);

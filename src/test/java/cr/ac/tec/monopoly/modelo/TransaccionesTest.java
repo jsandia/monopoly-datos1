@@ -27,13 +27,10 @@ class TransaccionesTest {
     }
 
     @Test
-    void compraConTarjetaContieneTodosLosCamposYElTurno() throws Exception {
+    void compraContieneTodosLosCamposYElTurno() throws Exception {
         registro.setTurno(7);
-        ana.registrarTarjeta("ABC123");
         Propiedad propiedad = new Propiedad(1, "San José", "Grupo", 1000, 100);
-        assertFalse(banco.comprarPropiedadConTarjeta(ana, propiedad, "INCORRECTA"));
-        assertEquals(0, registro.getHistorial().getCantidad());
-        assertTrue(banco.comprarPropiedadConTarjeta(ana, propiedad, "ABC123"));
+        assertTrue(banco.comprarPropiedad(ana, propiedad));
         Transaccion t = registro.getHistorial().desdeLaMasAntigua()[0];
         assertEquals(1, t.numero());
         assertNotNull(t.fechaHora());
@@ -138,9 +135,6 @@ class TransaccionesTest {
         assertTrue(reporte.contains(RegistroTransacciones.COLUMNAS));
         assertTrue(reporte.contains("Carta: premio de José"));
         assertTrue(reporte.indexOf("GANANCIA_EVENTO") < reporte.indexOf("PAGO_AL_BANCO"));
-        Path copia = carpeta.resolve("exportado.txt");
-        registro.exportar(copia);
-        assertEquals(reporte, Files.readString(copia));
         assertTrue(reporte.endsWith(registro.getHistorial().imprimirTodas()));
         assertEquals(2, registro.getHistorial().getCantidad());
     }
@@ -150,18 +144,12 @@ class TransaccionesTest {
         Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100);
         assertTrue(banco.comprarPropiedad(ana, propiedad));
         ana.registrarRecorrido(40);
-        assertTrue(banco.comprarCasa(ana, propiedad));
-        assertTrue(banco.venderCasa(ana, propiedad));
-        assertTrue(banco.hipotecarPropiedad(ana, propiedad));
-        assertTrue(banco.quitarHipoteca(ana, propiedad));
         for (int i = 0; i < 4; i++) assertTrue(banco.comprarCasa(ana, propiedad));
         assertTrue(banco.comprarHotel(ana, propiedad));
-        assertTrue(banco.venderHotel(ana, propiedad));
         assertTrue(banco.cobrarImpuesto(ana, 10));
-        assertTrue(banco.pagarJugador(ana, 10));
-        assertEquals(13, registro.getHistorial().getCantidad());
+        assertEquals(7, registro.getHistorial().getCantidad());
+        assertEquals(4, registro.getHistorial().buscarPorTipo(TipoTransaccion.COMPRA_CASA).length);
         assertEquals(1, registro.getHistorial().buscarPorTipo(TipoTransaccion.COMPRA_HOTEL).length);
-        assertEquals(1, registro.getHistorial().buscarPorTipo(TipoTransaccion.CANCELACION_HIPOTECA).length);
     }
 
     @Test
@@ -204,7 +192,7 @@ class TransaccionesTest {
         assertEquals(9990, ana.getSaldo());
         assertEquals(1, registro.getHistorial().getCantidad());
         assertNotNull(registro.getErrorEscritura());
-        registro.exportar(carpeta.resolve("recuperado.txt"));
-        assertTrue(Files.readString(carpeta.resolve("recuperado.txt")).contains("PAGO_AL_BANCO"));
+        // El historial en memoria sigue completo: se puede volver a exportar
+        assertTrue(registro.exportar().contains("PAGO_AL_BANCO"));
     }
 }

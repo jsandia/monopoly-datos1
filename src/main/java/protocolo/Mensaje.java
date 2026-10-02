@@ -23,7 +23,6 @@ public sealed interface Mensaje extends Serializable
         Mensaje.Ping,
         Mensaje.Pong,
         Mensaje.Registrarse,
-        Mensaje.IniciarSesion,
         Mensaje.CrearPartida,
         Mensaje.UnirsePartida,
         Mensaje.Respuesta,
@@ -55,17 +54,12 @@ public sealed interface Mensaje extends Serializable
 
 
     // =========================================================
-    // REGISTRO E INICIO DE SESIÓN
+    // REGISTRO DE USUARIOS
     // =========================================================
 
     record Registrarse(
             String nombre
     ) implements Mensaje {}
-
-    record IniciarSesion(
-            String nombre
-    ) implements Mensaje {}
-
 
     // =========================================================
     // PARTIDAS
@@ -132,7 +126,7 @@ public sealed interface Mensaje extends Serializable
 
     /** Datos oficiales de una propiedad; propietario es el índice del jugador o -1. */
     record EstadoPropiedad(int id, int propietario, int casas, boolean hotel,
-            boolean hipotecada, int renta, int precioCasa, String motivoNoComprarCasa,
+            int renta, int precioCasa, String motivoNoComprarCasa,
             int precioHotel, String motivoNoComprarHotel) implements Serializable {}
 
     record TerminarTurno() implements Mensaje {}

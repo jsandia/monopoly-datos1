@@ -78,11 +78,6 @@ public class VentanaTablero extends JFrame {
     private Timer temporizadorDados;                // != null mientras los dados están girando
     private Mensaje.EstadoJuego estadoPendiente;    // estado que llegó mientras giraban
 
-    /** Solo para ver el tablero sin servidor (no se puede jugar). */
-    public VentanaTablero() {
-        this(-1, mensaje -> { });
-    }
-
     /**
      * @param miComputadora el número (0 o 1) que el servidor le dio a esta computadora
      * @param enviar        cómo mandar una intención al servidor (Cliente::enviarAccion)
@@ -222,7 +217,6 @@ public class VentanaTablero extends JFrame {
                 areaDescripcion.setText("Grupo: " + p.getGrupo() + "\nPrecio: ₡" + p.getPrecio()
                         + "\nDueño: " + propietario + "\nRenta actual: ₡" + estado.renta()
                         + "\nCasas: " + estado.casas() + " | Hotel: " + (estado.hotel() ? "Sí" : "No")
-                        + "\nHipotecada: " + (estado.hipotecada() ? "Sí" : "No")
                         + (p.esEdificable() ? "\nPrecio por casa: ₡" + estado.precioCasa()
                         + "\nPrecio del hotel: ₡" + estado.precioHotel() : ""));
             }
@@ -524,11 +518,5 @@ public class VentanaTablero extends JFrame {
                     + " — " + (esHotel() ? "Hotel ₡" + estado.precioHotel() : "Casa ₡" + estado.precioCasa())
                     + (motivoNoComprar() == null ? "" : " (no disponible)");
         }
-    }
-
-    public static void main(String[] args) {
-        // Swing tiene su propio hilo para la interfaz (el "Event Dispatch Thread").
-        // invokeLater le pide a ese hilo que cree la ventana; nunca se crea desde main directo.
-        SwingUtilities.invokeLater(() -> new VentanaTablero().setVisible(true));
     }
 }

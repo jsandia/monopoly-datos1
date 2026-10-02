@@ -68,9 +68,6 @@ public final class Configuracion {
     /** Casas por propiedad antes de poder cambiarlas por un hotel. */
     public static final int MAX_CASAS_POR_PROPIEDAD = 4;
 
-    /** Interés que se paga al quitar una hipoteca (10 = 10%). */
-    public static final int INTERES_HIPOTECA_PORCENTAJE = 10;
-
     // =========================================================
     // RED
     // =========================================================

@@ -198,23 +198,6 @@ public class Cliente {
 
 
     // =========================================================
-    // LOGIN
-    // =========================================================
-
-    public Mensaje.Respuesta iniciarSesion(
-            String nombre
-    )
-            throws IOException, ClassNotFoundException {
-
-        enviar(
-                new Mensaje.IniciarSesion(nombre)
-        );
-
-        return recibirRespuesta();
-    }
-
-
-    // =========================================================
     // CREAR PARTIDA
     // =========================================================
 

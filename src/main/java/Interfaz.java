@@ -60,12 +60,6 @@ public class Interfaz {
         }
 
 
-        // =========================================================
-        // ESCUCHAR TARJETAS QUE LLEGAN DEL CAJERO
-        // =========================================================
-
-
-
         // =========================
         // TÍTULO
         // =========================
@@ -1034,9 +1028,6 @@ public class Interfaz {
         private final String nombreJugador1;
         private final String nombreJugador2;
 
-        private String tarjetaJugador1;
-        private String tarjetaJugador2;
-
         private int jugadorActual = 1;
 
         private final JLabel etiquetaJugador;
@@ -1274,12 +1265,8 @@ public class Interfaz {
             if (uid == null || uid.trim().isEmpty()) {
                 return;
             }
-
-            uid = uid.trim();
-
             if (jugadorActual == 1 && indiceLocal == 0) {
 
-                tarjetaJugador1 = uid;
                 etiquetaEstado.setText("Tarjeta registrada correctamente.");
                 jugadorActual = 2;
 
@@ -1294,7 +1281,6 @@ public class Interfaz {
 
             if (jugadorActual == 2 && indiceLocal == 1) {
 
-                tarjetaJugador2 = uid;
                 etiquetaEstado.setText("Tarjeta registrada correctamente.");
                 jugadorActual = 3;
 
@@ -1307,21 +1293,6 @@ public class Interfaz {
                 timer.setRepeats(false);
                 timer.start();
             }
-        }
-
-        // =========================================================
-        // GETTERS DE LAS TARJETAS
-        // =========================================================
-
-        public String getTarjetaJugador1() {
-
-            return tarjetaJugador1;
-        }
-
-
-        public String getTarjetaJugador2() {
-
-            return tarjetaJugador2;
         }
     }
 }

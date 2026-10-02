@@ -83,14 +83,6 @@ public final class RegistroTransacciones {
         return consultar(null, null, false);
     }
 
-    public synchronized void exportar(Path destino) {
-        try {
-            Files.writeString(destino, exportar(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("No se pudo exportar el historial", e);
-        }
-    }
-
     public synchronized void escribir(String texto) {
         try {
             Files.writeString(archivo, texto + System.lineSeparator(), StandardCharsets.UTF_8,

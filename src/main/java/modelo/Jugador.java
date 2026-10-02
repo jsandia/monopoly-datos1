@@ -205,11 +205,6 @@ public class Jugador {
         }
     }
 
-    // Quita una propiedad de su lista
-    public void quitarPropiedad(Propiedad propiedad) {
-        propiedades.eliminar(propiedad);
-    }
-
     /**
      * Entrega todas sus propiedades (por bancarrota) y deja su lista vacia.
      * Primero se copian a un arreglo recorriendo los nodos, y despues se

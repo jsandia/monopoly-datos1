@@ -14,10 +14,7 @@ import config.Configuracion;
  * - Alquileres
  * - Impuestos
  * - Pago por pasar por la salida
- * - Compra y venta de casas
- * - Compra y venta de hoteles
- * - Hipotecas
- * - Cancelación de hipotecas
+ * - Compra de casas y hoteles
  */
 public class Banco {
 
@@ -170,13 +167,6 @@ public class Banco {
     // =========================================================
     // PAGAR A JUGADOR
     // =========================================================
-
-    /**
-     * El banco paga dinero a un jugador.
-     */
-    public synchronized boolean pagarJugador(Jugador jugador, int monto) {
-        return pagarJugador(jugador, monto, TipoTransaccion.PAGO_DEL_BANCO, "Banco");
-    }
 
     private boolean pagarJugador(Jugador jugador, int monto, TipoTransaccion tipo, String descripcion) {
         int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
@@ -386,11 +376,6 @@ public class Banco {
             return false;
         }
 
-        // Una propiedad hipotecada no cobra alquiler.
-        if (propiedad.estaHipotecada()) {
-            return false;
-        }
-
         int alquiler =
                 propiedad.calcularAlquiler();
 
@@ -475,73 +460,6 @@ public class Banco {
     }
 
     // =========================================================
-    // VENDER CASA
-    // =========================================================
-
-    /**
-     * El jugador vende una casa al banco.
-     *
-     * Recibe la mitad del precio de compra.
-     */
-    public synchronized boolean venderCasa(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // Debe ser dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // Debe tener al menos una casa.
-        if (propiedad.getCantidadCasas() <= 0) {
-            return false;
-        }
-
-        int precioVenta =
-                propiedad.getPrecioCasa() / 2;
-
-        if (precioVenta <= 0) {
-            return false;
-        }
-
-        // El banco debe tener dinero para pagar.
-        if (!entregarDinero(precioVenta)) {
-            return false;
-        }
-
-        // Quitamos la casa.
-        if (!propiedad.quitarCasa()) {
-
-            // Si falla, devolvemos el dinero al banco.
-            recibirDinero(precioVenta);
-
-            return false;
-        }
-
-        // El jugador recibe el dinero.
-        jugador.acreditar(precioVenta);
-
-        // La casa vuelve al banco.
-        casasDisponibles++;
-
-        registrar(jugador, TipoTransaccion.VENTA_CASA, propiedad.getNombre(), saldoAnterior);
-
-        return true;
-    }
-
-
-    // =========================================================
     // COMPRAR HOTEL
     // =========================================================
 
@@ -609,228 +527,12 @@ public class Banco {
         if (propiedad == null) return "Selecciona una propiedad válida.";
         if (jugador == null || propiedad.getPropietario() != jugador) return "La propiedad no pertenece al jugador en turno.";
         if (!propiedad.esEdificable()) return "No se construyen hoteles en transportes ni servicios.";
-        if (propiedad.estaHipotecada()) return "La propiedad está hipotecada.";
         if (propiedad.tieneHotel()) return "La propiedad ya tiene un hotel.";
         if (propiedad.getCantidadCasas() != Configuracion.MAX_CASAS_POR_PROPIEDAD) return "Necesitas cuatro casas en esta propiedad para comprar un hotel.";
         if (hotelesDisponibles <= 0) return "El banco no tiene hoteles disponibles.";
         if (jugador.getSaldo() < propiedad.getPrecioHotel()) return "Saldo insuficiente para comprar un hotel.";
         return null;
     }
-
-    // =========================================================
-    // VENDER HOTEL
-    // =========================================================
-
-    /**
-     * El jugador vende un hotel al banco.
-     *
-     * Recibe la mitad del precio del hotel.
-     */
-    public synchronized boolean venderHotel(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // Debe ser dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // Debe tener hotel.
-        if (!propiedad.tieneHotel()) {
-            return false;
-        }
-
-        int precioVenta =
-                propiedad.getPrecioHotel() / 2;
-
-        if (precioVenta <= 0) {
-            return false;
-        }
-
-        // El banco debe poder pagar.
-        if (!entregarDinero(precioVenta)) {
-            return false;
-        }
-
-        // Quitamos el hotel.
-        if (!propiedad.quitarHotel()) {
-
-            // Devolvemos el dinero al banco.
-            recibirDinero(precioVenta);
-
-            return false;
-        }
-
-        // El jugador recibe el dinero.
-        jugador.acreditar(precioVenta);
-
-        // El hotel vuelve al banco.
-        hotelesDisponibles++;
-
-        registrar(jugador, TipoTransaccion.VENTA_HOTEL, propiedad.getNombre(), saldoAnterior);
-
-        return true;
-    }
-
-
-    // =========================================================
-    // HIPOTECAR PROPIEDAD
-    // =========================================================
-
-    /**
-     * Hipoteca una propiedad.
-     *
-     * El banco paga al jugador el valor
-     * establecido para la hipoteca.
-     */
-    public synchronized boolean hipotecarPropiedad(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // Debe ser dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // Ya está hipotecada.
-        if (propiedad.estaHipotecada()) {
-            return false;
-        }
-
-        // No se puede hipotecar con casas.
-        if (propiedad.getCantidadCasas() > 0) {
-            return false;
-        }
-
-        // No se puede hipotecar con hotel.
-        if (propiedad.tieneHotel()) {
-            return false;
-        }
-
-        int valorHipoteca =
-                propiedad.getValorHipoteca();
-
-        if (valorHipoteca <= 0) {
-            return false;
-        }
-
-        // El banco debe tener suficiente dinero.
-        if (!entregarDinero(valorHipoteca)) {
-            return false;
-        }
-
-        // Marcamos la propiedad como hipotecada.
-        if (!propiedad.hipotecar()) {
-
-            // Devolvemos el dinero al banco.
-            recibirDinero(valorHipoteca);
-
-            return false;
-        }
-
-        // El jugador recibe el dinero.
-        jugador.acreditar(valorHipoteca);
-
-        registrar(jugador, TipoTransaccion.HIPOTECA, propiedad.getNombre(), saldoAnterior);
-
-        return true;
-    }
-
-
-    // =========================================================
-    // QUITAR HIPOTECA
-    // =========================================================
-
-    /**
-     * Quita la hipoteca de una propiedad.
-     *
-     * El jugador paga:
-     *
-     * valor de hipoteca + 10% de interés.
-     */
-    public synchronized boolean quitarHipoteca(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // Debe ser dueño.
-        if (propiedad.getPropietario() != jugador) {
-            return false;
-        }
-
-        // Debe estar hipotecada.
-        if (!propiedad.estaHipotecada()) {
-            return false;
-        }
-
-        int valorHipoteca =
-                propiedad.getValorHipoteca();
-
-        if (valorHipoteca <= 0) {
-            return false;
-        }
-
-        // Interés sobre el valor de la hipoteca (10% en el juego original).
-        int interes =
-                valorHipoteca * Configuracion.INTERES_HIPOTECA_PORCENTAJE / 100;
-
-        int montoTotal =
-                valorHipoteca + interes;
-
-        // El jugador debe poder pagar.
-        if (!jugador.debitar(montoTotal)) {
-            return false;
-        }
-
-        // Quitamos la hipoteca.
-        if (!propiedad.quitarHipoteca()) {
-
-            // Si falla, devolvemos el dinero.
-            jugador.acreditar(montoTotal);
-
-            return false;
-        }
-
-        // El banco recibe el pago.
-        recibirDinero(montoTotal);
-
-        registrar(jugador, TipoTransaccion.CANCELACION_HIPOTECA, propiedad.getNombre(), saldoAnterior);
-
-        return true;
-    }
-
 
     // =========================================================
     // BANCARROTA
@@ -881,7 +583,7 @@ public class Banco {
     }
 
     // =========================================================
-    // PAGOS CON TARJETA RFID
+    // PAGOS ENTRE JUGADORES Y CARTAS DE EVENTO
     // =========================================================
 
     /** Pago validado entre jugadores; una sola transaccion representa ambos movimientos. */
@@ -911,14 +613,4 @@ public class Banco {
         if (descripcion == null) return false;
         return cobrarJugador(jugador, monto, TipoTransaccion.PERDIDA_EVENTO, descripcion);
     }
-
-    private boolean validarTarjetaPago(Jugador jugador, String uid) {
-        return jugador != null && jugador.validarTarjeta(uid);
-    }
-
-    public synchronized boolean comprarPropiedadConTarjeta(Jugador jugador, Propiedad propiedad, String uid) {
-        if (!validarTarjetaPago(jugador, uid)) return false;
-        return comprarPropiedad(jugador, propiedad);
-    }
-
 }

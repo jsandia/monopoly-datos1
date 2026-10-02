@@ -75,7 +75,6 @@ public class ManejadorCliente implements Runnable {
         switch (mensaje) {
             // Antes de jugar: usuarios y partidas
             case Mensaje.Registrarse m -> servidor.registrarUsuario(m.nombre(), out);
-            case Mensaje.IniciarSesion m -> servidor.iniciarSesion(m.nombre(), out);
             case Mensaje.CrearPartida m ->
                     servidor.crearPartida(m.jugador1(), m.jugador2(), computadora, out);
             case Mensaje.UnirsePartida m ->
