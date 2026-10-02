@@ -355,6 +355,12 @@ public class VentanaTablero extends JFrame {
                         ? "🎲 Tirá los dados en el cajero"
                         : "Esperando a que " + nombreEnTurno + " tire los dados");
             }
+        } else if (estado.pagoPendiente() != null) {
+            // Cayó en una propiedad ajena: no puede seguir hasta pagar con su tarjeta
+            etiquetaIndicacion.setText(esMiTurno
+                    ? "💳 Acercá tu tarjeta al cajero para pagar " + estado.pagoPendiente()
+                    : nombreEnTurno + " debe pagar " + estado.pagoPendiente());
+            mostrarCasilla(modeloTablero.obtenerCasilla(estado.posiciones()[enTurno]));
         } else {
             etiquetaIndicacion.setText(esMiTurno ? "Comprá o terminá el turno" : "Juega " + nombreEnTurno);
             mostrarCasilla(modeloTablero.obtenerCasilla(estado.posiciones()[enTurno]));
@@ -374,9 +380,10 @@ public class VentanaTablero extends JFrame {
         for (Mensaje.EstadoPropiedad p : estado.propiedades()) {
             if (p != null && p.propietario() == enTurno && p.precioCasa() > 0) tienePropiedadEdificable = true;
         }
-        botonComprarCasa.setEnabled(esMiTurno && tienePropiedadEdificable);
+        boolean debeAlquiler = estado.pagoPendiente() != null;
+        botonComprarCasa.setEnabled(esMiTurno && tienePropiedadEdificable && !debeAlquiler);
         botonComprarCasa.setToolTipText("Construye en tus propiedades durante tu turno, antes o después de tirar.");
-        botonTerminarTurno.setEnabled(esMiTurno && estado.yaTiro());
+        botonTerminarTurno.setEnabled(esMiTurno && estado.yaTiro() && !debeAlquiler);
         boolean presoSinTirar = esMiTurno && !estado.yaTiro() && estado.enCarcel()[enTurno];
         botonPagarMulta.setEnabled(presoSinTirar);
         botonUsarCarta.setEnabled(presoSinTirar && estado.cartasCarcel()[enTurno] > 0);

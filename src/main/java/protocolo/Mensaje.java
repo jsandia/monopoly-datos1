@@ -176,7 +176,8 @@ public sealed interface Mensaje extends Serializable
      * cartas "Salga de la cárcel" tiene guardadas. activos[i] es false si
      * quedó en bancarrota, y patrimonios[i] es su saldo + valor de propiedades.
      * Al terminar, ganador es el índice del ganador (-1 mientras se juega) y
-     * empate dice si ganó por desempate.
+     * empate dice si ganó por desempate. pagoPendiente describe el alquiler
+     * que el jugador en turno debe pagar con su tarjeta (null si no debe nada).
      */
     record EstadoJuego(
             int turnoGlobal,
@@ -197,6 +198,7 @@ public sealed interface Mensaje extends Serializable
             boolean[] activos,
             int[] patrimonios,
             int ganador,
-            boolean empate
+            boolean empate,
+            String pagoPendiente
     ) implements Mensaje {}
 }

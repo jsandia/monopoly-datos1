@@ -28,14 +28,37 @@ class JuegoPagosTest {
         Files.deleteIfExists(juego.getArchivoTransacciones());
     }
 
+    private int alquileresRegistrados() {
+        return juego.getRegistroTransacciones().getHistorial()
+                .buscarPorTipo(TipoTransaccion.PAGO_ALQUILER).length;
+    }
+
     @Test
-    void caerEnPropiedadDeOtroTransfiereAlquilerAlPropietario() {
+    void caerEnPropiedadDeOtroDejaElAlquilerPendienteSinMoverDinero() {
         Propiedad aeropuerto = (Propiedad) juego.getTablero().obtenerCasilla(5);
         assertTrue(juego.getBanco().comprarPropiedad(jose, aeropuerto));
         ana.setPosicionActual(2);
 
         String resultado = juego.jugarTiro(1, 2);
 
+        assertTrue(resultado.contains("debe pagar ₡25 de alquiler a José"));
+        assertTrue(juego.hayAlquilerPendiente());
+        assertSame(aeropuerto, juego.getAlquilerPendiente());
+        assertEquals(1500, ana.getSaldo());
+        assertEquals(1300, jose.getSaldo());
+        assertEquals(0, alquileresRegistrados());
+    }
+
+    @Test
+    void pagarElAlquilerPendienteTransfiereAlPropietario() {
+        Propiedad aeropuerto = (Propiedad) juego.getTablero().obtenerCasilla(5);
+        assertTrue(juego.getBanco().comprarPropiedad(jose, aeropuerto));
+        ana.setPosicionActual(2);
+        juego.jugarTiro(1, 2);
+
+        String resultado = juego.pagarAlquilerPendiente();
+
+        assertFalse(juego.hayAlquilerPendiente());
         assertEquals(1475, ana.getSaldo());
         assertEquals(1325, jose.getSaldo());
         assertTrue(resultado.contains("paga ₡25 de alquiler a José"));
@@ -48,6 +71,39 @@ class JuegoPagosTest {
     }
 
     @Test
+    void conUnAlquilerPendienteNoSePuedeTerminarElTurno() {
+        assertTrue(juego.getBanco().comprarPropiedad(jose, (Propiedad) juego.getTablero().obtenerCasilla(5)));
+        ana.setPosicionActual(2);
+        juego.jugarTiro(1, 2);
+
+        assertThrows(IllegalStateException.class, () -> juego.terminarTurnoActual());
+        assertSame(ana, juego.getJugadorActual());
+
+        juego.pagarAlquilerPendiente();
+        juego.terminarTurnoActual();
+        assertSame(jose, juego.getJugadorActual());
+    }
+
+    @Test
+    void pagarSinAlquilerPendienteEsUnError() {
+        assertThrows(IllegalStateException.class, () -> juego.pagarAlquilerPendiente());
+    }
+
+    @Test
+    void siAlPagarYaNoLeAlcanzaQuedaEnBancarrota() {
+        assertTrue(juego.getBanco().comprarPropiedad(jose, (Propiedad) juego.getTablero().obtenerCasilla(5)));
+        ana.setPosicionActual(2);
+        juego.jugarTiro(1, 2);
+        ana.setSaldo(10); // por ejemplo, gastó antes de pagar
+
+        String resultado = juego.pagarAlquilerPendiente();
+
+        assertTrue(resultado.contains("BANCARROTA"));
+        assertFalse(ana.isActivo());
+        assertEquals(1310, jose.getSaldo());
+    }
+
+    @Test
     void caerEnPropiedadPropiaNoCobraAlquiler() {
         Propiedad aeropuerto = (Propiedad) juego.getTablero().obtenerCasilla(5);
         assertTrue(juego.getBanco().comprarPropiedad(ana, aeropuerto));
@@ -56,8 +112,8 @@ class JuegoPagosTest {
         juego.jugarTiro(1, 2);
 
         assertEquals(1300, ana.getSaldo());
-        assertEquals(0, juego.getRegistroTransacciones().getHistorial()
-                .buscarPorTipo(TipoTransaccion.PAGO_ALQUILER).length);
+        assertFalse(juego.hayAlquilerPendiente());
+        assertEquals(0, alquileresRegistrados());
     }
 
     @Test
@@ -82,7 +138,7 @@ class JuegoPagosTest {
     }
 
     @Test
-    void cartaQueMueveAPropiedadResuelveSuAlquiler() {
+    void cartaQueMueveAPropiedadAjenaTambienDejaElAlquilerPendiente() {
         Propiedad puertoCaldera = (Propiedad) juego.getTablero().obtenerCasilla(15);
         assertTrue(juego.getBanco().comprarPropiedad(jose, puertoCaldera));
         ana.setPosicionActual(4);
@@ -93,9 +149,12 @@ class JuegoPagosTest {
         juego.jugarTiro(1, 2); // Suerte la mueve al transporte de la casilla 15.
 
         assertEquals(15, ana.getPosicionActual());
+        assertSame(puertoCaldera, juego.getAlquilerPendiente());
+        assertEquals(1500, ana.getSaldo());
+
+        juego.pagarAlquilerPendiente();
         assertEquals(1475, ana.getSaldo());
         assertEquals(1325, jose.getSaldo());
-        assertEquals(1, juego.getRegistroTransacciones().getHistorial()
-                .buscarPorTipo(TipoTransaccion.PAGO_ALQUILER).length);
+        assertEquals(1, alquileresRegistrados());
     }
 }

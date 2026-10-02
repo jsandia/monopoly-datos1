@@ -93,6 +93,10 @@ public class Servidor {
     private enum TipoCompra { PROPIEDAD, CASA, HOTEL }
     private TipoCompra tipoCompraPendiente = TipoCompra.PROPIEDAD;
 
+    // Mientras se debe un alquiler no se puede comprar ni terminar el turno
+    private static final String MENSAJE_ALQUILER_PENDIENTE =
+            "Primero hay que pagar el alquiler: acerque la tarjeta al cajero.";
+
 
     // =========================================================
     // CONSTRUCTORES
@@ -789,12 +793,40 @@ public class Servidor {
         } else if (!quienTiro.isActivo()) {
             // Quebró en su propio tiro: no tiene nada más que hacer en este turno
             pasarTurno();
+        } else if (juego.hayAlquilerPendiente()) {
+            pedirPagoDeAlquiler(quienTiro);
         }
 
         // ...y después cómo quedó todo
         difundir(crearEstado());
 
         return null;
+    }
+
+    // Cayó en una propiedad ajena: el alquiler se paga acercando la tarjeta.
+    // Si el jugador no registró tarjeta, se cobra solo para no trabar la partida.
+    // Hay que llamarlo teniendo gameLock.
+    private void pedirPagoDeAlquiler(Jugador deudor) {
+
+        if (deudor.tieneTarjetaRegistrada()) {
+            difundir(new Mensaje.Aviso("💳 " + deudor.getNombre()
+                    + ", acerque su tarjeta al cajero para pagar el alquiler."));
+            return;
+        }
+
+        difundir(new Mensaje.Aviso(juego.pagarAlquilerPendiente()
+                + " (sin tarjeta registrada: se cobró automáticamente)"));
+        revisarSiQuebroAlPagar(deudor);
+    }
+
+    // Después de cobrar un alquiler: si el deudor quebró, se termina su turno
+    // (o la partida). Hay que llamarlo teniendo gameLock.
+    private void revisarSiQuebroAlPagar(Jugador deudor) {
+        if (juego.esFinDeJuego()) {
+            difundir(new Mensaje.Aviso(textoFinDePartida()));
+        } else if (!deudor.isActivo()) {
+            pasarTurno();
+        }
     }
 
     void tirarDadosPrueba(
@@ -839,6 +871,9 @@ public class Servidor {
 
             if (error == null && !yaTiro) {
                 error = "Primero hay que tirar los dados.";
+            }
+            if (error == null && juego.hayAlquilerPendiente()) {
+                error = MENSAJE_ALQUILER_PENDIENTE;
             }
             if (error == null && jugadorPendientePago != null) {
                 error = "Ya hay una compra esperando el pago con tarjeta.";
@@ -904,6 +939,7 @@ public class Servidor {
     private void comprarConstruccion(int computadora, ObjectOutputStream out, int idPropiedad, boolean hotel) throws IOException {
         synchronized (gameLock) {
             String error = validarTurno(computadora);
+            if (error == null && juego.hayAlquilerPendiente()) error = MENSAJE_ALQUILER_PENDIENTE;
             if (error == null && jugadorPendientePago != null) error = "Ya hay una compra esperando el pago con tarjeta.";
             Propiedad propiedad = null;
             if (error == null) {
@@ -989,6 +1025,10 @@ public class Servidor {
 
             if (error == null && !yaTiro) {
                 error = "Todavía no se han tirado los dados.";
+            }
+
+            if (error == null && juego.hayAlquilerPendiente()) {
+                error = MENSAJE_ALQUILER_PENDIENTE;
             }
 
             if (error != null) {
@@ -1197,8 +1237,19 @@ public class Servidor {
                 activos,
                 patrimonios,
                 ganador,
-                juego.hayEmpate()
+                juego.hayEmpate(),
+                textoAlquilerPendiente()
         );
+    }
+
+    // "₡14 de alquiler a Beto por Liberia", o null si no se debe nada
+    private String textoAlquilerPendiente() {
+        Propiedad propiedad = juego.getAlquilerPendiente();
+        if (propiedad == null) {
+            return null;
+        }
+        return "₡" + propiedad.calcularAlquiler() + " de alquiler a "
+                + propiedad.getPropietario().getNombre() + " por " + propiedad.getNombre();
     }
 
 
@@ -1306,7 +1357,28 @@ public class Servidor {
 
             System.out.println("[CAJERO] Tarjeta: " + uid);
 
-            // Primero: si hay una compra esperando pago.
+            // Primero: un alquiler pendiente. Es obligatorio, así que va antes
+            // que cualquier compra que el jugador haya pedido.
+            if (juego != null && !juego.esFinDeJuego() && juego.hayAlquilerPendiente()) {
+
+                Jugador deudor = juego.getJugadorActual();
+
+                if (!deudor.validarTarjeta(uid)) {
+                    avisarComputadora(
+                            computadoraDe[indiceEnTurno()],
+                            "Tarjeta incorrecta. Debe pagar el alquiler "
+                                    + deudor.getNombre() + "."
+                    );
+                    return;
+                }
+
+                difundir(new Mensaje.Aviso("💳 " + juego.pagarAlquilerPendiente()));
+                revisarSiQuebroAlPagar(deudor);
+                difundir(crearEstado());
+                return;
+            }
+
+            // Segundo: si hay una compra esperando pago.
             if (jugadorPendientePago != null && propiedadPendientePago != null) {
 
                 if (!jugadorPendientePago.validarTarjeta(uid)) {
@@ -1351,7 +1423,7 @@ public class Servidor {
                 return;
             }
 
-            // Segundo: registro de tarjeta solicitado por una computadora.
+            // Tercero: registro de tarjeta solicitado por una computadora.
             for (int computadora = 0; computadora < 2; computadora++) {
                 int indiceLocal = jugadorLocalEsperandoTarjeta[computadora];
                 if (indiceLocal == -1) continue;

@@ -26,6 +26,10 @@ public class Juego {
     private Jugador ganador;
     private boolean hayEmpate;
 
+    // Propiedad ajena donde cayo el jugador en turno y cuyo alquiler todavia
+    // no pago. Lo debe el jugador del frente de la cola. null = no debe nada.
+    private Propiedad alquilerPendiente;
+
     // Componentes e infraestructuras de la partida
 
     // Turnos: el del frente es el que juega. Pasar el turno es sacarlo del
@@ -267,10 +271,13 @@ public class Juego {
 
             int alquiler = propiedad.calcularAlquiler();
             if (jugador.getSaldo() < alquiler) {
+                // No le alcanza: la bancarrota es inmediata, no se espera ningun pago
                 declararBancarrota(jugador, propietario, TipoTransaccion.PAGO_ALQUILER,
                         "Alquiler de " + propiedad.getNombre(), alquiler, log);
-            } else if (banco.cobrarAlquiler(jugador, propiedad)) {
-                log.append("\n").append(jugador.getNombre()).append(" paga ₡")
+            } else {
+                // Queda debiendo: se cobra con pagarAlquilerPendiente()
+                alquilerPendiente = propiedad;
+                log.append("\n").append(jugador.getNombre()).append(" debe pagar ₡")
                         .append(alquiler).append(" de alquiler a ")
                         .append(propietario.getNombre()).append(" por ")
                         .append(propiedad.getNombre()).append(".");
@@ -459,6 +466,9 @@ public class Juego {
      */
     public synchronized String terminarTurnoActual() {
         if (terminado) return "";
+        if (alquilerPendiente != null) {
+            throw new IllegalStateException("No se puede terminar el turno con un alquiler sin pagar");
+        }
         StringBuilder log = new StringBuilder();
 
         Jugador saliente = turnos.desencolar();
@@ -500,6 +510,55 @@ public class Juego {
                 turnos.encolar(jugador);
             }
         }
+    }
+
+    // =========================================================
+    // ALQUILER PENDIENTE
+    // =========================================================
+    // Al caer en una propiedad ajena el alquiler no se cobra solo: queda
+    // pendiente hasta que el jugador lo autorice (con su tarjeta RFID, pero
+    // eso lo valida el servidor; Juego no sabe de tarjetas).
+
+    /** @return true si el jugador en turno debe un alquiler */
+    public synchronized boolean hayAlquilerPendiente() {
+        return alquilerPendiente != null;
+    }
+
+    /** @return la propiedad cuyo alquiler se debe, o null */
+    public synchronized Propiedad getAlquilerPendiente() {
+        return alquilerPendiente;
+    }
+
+    /**
+     * Cobra el alquiler pendiente al jugador en turno y se lo da al dueño.
+     * Si en el camino el saldo dejo de alcanzar, es bancarrota.
+     *
+     * @return lo que paso, para mostrarlo a los jugadores
+     * @throws IllegalStateException si no hay ningun alquiler pendiente
+     */
+    public synchronized String pagarAlquilerPendiente() {
+        if (alquilerPendiente == null) {
+            throw new IllegalStateException("No hay ningun alquiler pendiente");
+        }
+        Propiedad propiedad = alquilerPendiente;
+        alquilerPendiente = null;
+
+        Jugador jugador = turnos.verFrente();
+        Jugador propietario = propiedad.getPropietario();
+        int alquiler = propiedad.calcularAlquiler();
+        StringBuilder log = new StringBuilder();
+
+        if (jugador.getSaldo() < alquiler) {
+            declararBancarrota(jugador, propietario, TipoTransaccion.PAGO_ALQUILER,
+                    "Alquiler de " + propiedad.getNombre(), alquiler, log);
+        } else {
+            banco.cobrarAlquiler(jugador, propiedad);
+            log.append(jugador.getNombre()).append(" paga ₡")
+                    .append(alquiler).append(" de alquiler a ")
+                    .append(propietario.getNombre()).append(" por ")
+                    .append(propiedad.getNombre()).append(".");
+        }
+        return log.toString().strip();
     }
 
     // =========================================================
