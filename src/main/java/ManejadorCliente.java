@@ -95,9 +95,6 @@ public class ManejadorCliente implements Runnable {
             case Mensaje.ExportarTransacciones _ ->
                     servidor.consultarTransacciones(computadora, out, null, true);
 
-            // Prueba de conexión: se devuelve la misma marca de tiempo
-            case Mensaje.Ping ping -> servidor.escribir(out, new Mensaje.Pong(ping.enviadoMs()));
-
             // El resto (EstadoJuego, Aviso, Dados...) solo lo manda el servidor:
             // si un cliente lo envía, se ignora
             default -> { }

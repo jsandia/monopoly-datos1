@@ -4,48 +4,45 @@ import config.Configuracion;
 import estructuras.ColaCircular;
 import estructuras.Nodo;
 
+import java.nio.file.Path;
+
 /**
- * Clase Juego
- * Administra el estado global de la partida: el tablero circular, el banco,
- * los turnos, los mazos de cartas y la carcel.
- * Permite ejecutar las acciones por medio de software mientras el hardware no este conectado.
+ * Las reglas del Monopoly y el estado de la partida: el tablero, el banco,
+ * la cola de turnos, los mazos de cartas, los dados y la cárcel.
  *
- * Solo el servidor tiene un Juego. Los metodos que cambian el estado devuelven
- * un texto con lo que paso, para que el servidor se lo mande a los clientes.
+ * Solo el servidor tiene un Juego. Los métodos que cambian el estado devuelven
+ * un texto con lo que pasó, para que el servidor se lo mande a los clientes.
+ * Los montos y las reglas ajustables (Salida, multa, intentos en la cárcel...)
+ * están en Configuracion.
  */
 public class Juego {
 
-    // Los montos y reglas (Salida, multa, intentos en la carcel...) estan en Configuracion
-
-    // Variables para el control de turnos y fin de juego
-    private int maxTurnos;
-    private int turnoActualGlobal;
+    private final int maxTurnos;
+    private int turnoActualGlobal = 1;
     private boolean terminado;
 
     // Se calculan al terminar la partida
     private Jugador ganador;
     private boolean hayEmpate;
 
-    // Propiedad ajena donde cayo el jugador en turno y cuyo alquiler todavia
-    // no pago. Lo debe el jugador del frente de la cola. null = no debe nada.
+    // Propiedad ajena donde cayó el jugador en turno y cuyo alquiler todavía
+    // no pagó. Lo debe el jugador del frente de la cola. null = no debe nada.
     private Propiedad alquilerPendiente;
-
-    // Componentes e infraestructuras de la partida
 
     // Turnos: el del frente es el que juega. Pasar el turno es sacarlo del
     // frente y meterlo al final. Es la misma ColaCircular de los mazos,
     // pero con T = Jugador.
     private final ColaCircular<Jugador> turnos;
-    private final Tablero tablero;
-    private Banco banco;
-    private RegistroTransacciones registro;
+    private final Tablero tablero = new Tablero();
+    private final Banco banco = new Banco();
+    private final RegistroTransacciones registro;
 
     // Mazos: se saca la carta del frente, se aplica y se mete al final
     private final ColaCircular<CartaEvento> mazoArcaComunal;
     private final ColaCircular<CartaEvento> mazoSuerte;
 
-    // Los dos dados de la partida. Guardan la ultima tirada, venga del
-    // cajero (dado fisico) o del boton de dados de prueba.
+    // Los dos dados de la partida. Guardan la última tirada, venga del
+    // cajero (dado físico) o del botón de dados de prueba.
     private final Dado dado1 = new Dado();
     private final Dado dado2 = new Dado();
 
@@ -55,24 +52,19 @@ public class Juego {
 
     /**
      * @param barajarMazos false deja las cartas en el orden de CartaEvento
-     *                     (solo para pruebas, donde hace falta saber que sale)
+     *                     (solo para pruebas, donde hace falta saber qué sale)
      */
     public Juego(int maxTurnos, int cantidadJugadores, String codigoPartida, boolean barajarMazos) {
-        this.registro = new RegistroTransacciones(codigoPartida);
         this.maxTurnos = maxTurnos;
-        this.turnoActualGlobal = 1;
-        this.terminado = false;
-
         this.turnos = new ColaCircular<>(cantidadJugadores);
-        this.tablero = new Tablero();
-        this.banco = new Banco();
+        this.registro = new RegistroTransacciones(codigoPartida);
         this.banco.setRegistroTransacciones(registro);
 
         this.mazoArcaComunal = crearMazo(CartaEvento.crearMazoArcaComunal(), barajarMazos);
         this.mazoSuerte = crearMazo(CartaEvento.crearMazoSuerte(), barajarMazos);
     }
 
-    // Mete las cartas en una cola circular del tamano exacto del mazo
+    // Mete las cartas en una cola circular del tamaño exacto del mazo
     private static ColaCircular<CartaEvento> crearMazo(CartaEvento[] cartas, boolean barajar) {
         if (barajar) {
             barajar(cartas);
@@ -84,7 +76,7 @@ public class Juego {
         return mazo;
     }
 
-    // Fisher-Yates: recorre de atras hacia adelante cambiando cada carta
+    // Fisher-Yates: recorre de atrás hacia adelante cambiando cada carta
     // con otra al azar de las que quedan antes. Todas las mezclas son igual de probables.
     private static void barajar(CartaEvento[] cartas) {
         for (int i = cartas.length - 1; i > 0; i--) {
@@ -95,14 +87,14 @@ public class Juego {
         }
     }
 
-    // Agrega un jugador al final de la cola de turnos: juegan en el orden en que entran
+    /** Agrega un jugador al final de la cola de turnos: juegan en el orden en que entran. */
     public synchronized void agregarJugador(Jugador jugador) {
         if (!turnos.encolar(jugador)) {
             throw new IllegalStateException("La partida ya tiene " + turnos.capacidad() + " jugadores");
         }
         if (jugador.getSaldo() > 0) {
             registro.registrar(TipoTransaccion.SALDO_INICIAL, null, jugador, jugador.getSaldo(),
-                    "Asignacion inicial de dinero", banco.getSaldo(), banco.getSaldo(), 0, jugador.getSaldo());
+                    "Asignación inicial de dinero", banco.getSaldo(), banco.getSaldo(), 0, jugador.getSaldo());
         }
     }
 
@@ -132,16 +124,16 @@ public class Juego {
 
     /**
      * Aplica una tirada al jugador en turno con todas las reglas:
-     * si esta preso intenta salir; si se mueve, cobra Salida al pasar
-     * y resuelve la casilla donde cae (alquileres, impuestos, cartas y carcel).
+     * si está preso intenta salir; si se mueve, cobra Salida al pasar
+     * y resuelve la casilla donde cae (alquileres, impuestos, cartas y cárcel).
      *
      * Las caras quedan guardadas en los dos Dado de la partida, sin importar
      * si vienen del cajero o de lanzarDados().
      *
-     * @param cara1 lo que salio en el primer dado (1 a 6)
-     * @param cara2 lo que salio en el segundo dado (1 a 6)
-     * @return lo que paso, una linea por evento, para mostrar a los jugadores
-     * @throws IllegalArgumentException si alguna cara no es valida
+     * @param cara1 lo que salió en el primer dado (1 a 6)
+     * @param cara2 lo que salió en el segundo dado (1 a 6)
+     * @return lo que pasó, una línea por evento, para mostrar a los jugadores
+     * @throws IllegalArgumentException si alguna cara no es válida
      */
     public synchronized String jugarTiro(int cara1, int cara2) {
         Jugador actual = turnos.verFrente();
@@ -167,7 +159,7 @@ public class Juego {
         return log.toString();
     }
 
-    // Reglas clasicas de la carcel al tirar estando preso.
+    // Reglas clásicas de la cárcel al tirar estando preso.
     // Devuelve true si sale (y entonces se mueve la suma de los dados).
     private boolean intentarSalirConDados(Jugador jugador, boolean dobles, StringBuilder log) {
         if (dobles) {
@@ -200,9 +192,9 @@ public class Juego {
     }
 
     /**
-     * Paga la multa antes de tirar para salir de la carcel.
+     * Paga la multa antes de tirar para salir de la cárcel.
      *
-     * @return true si estaba preso y le alcanzo para pagar
+     * @return true si estaba preso y le alcanzó para pagar
      */
     public synchronized boolean pagarMultaCarcel() {
         Jugador actual = turnos.verFrente();
@@ -213,10 +205,10 @@ public class Juego {
     }
 
     /**
-     * Usa una carta "Salga de la carcel" antes de tirar. La carta vuelve
+     * Usa una carta "Salga de la cárcel" antes de tirar. La carta vuelve
      * al final de su mazo, como en el juego original.
      *
-     * @return true si estaba preso y tenia carta
+     * @return true si estaba preso y tenía carta
      */
     public synchronized boolean usarCartaSalirCarcel() {
         Jugador actual = turnos.verFrente();
@@ -234,9 +226,9 @@ public class Juego {
 
     /**
      * Mueve la ficha casilla por casilla: cada paso es un salto a
-     * getSiguiente() en la lista circular del tablero. Despues de la ultima
-     * casilla, getSiguiente() ya es Salida, asi que no hace falta ningun
-     * calculo de "dar la vuelta".
+     * getSiguiente() en la lista circular del tablero. Después de la última
+     * casilla, getSiguiente() ya es Salida, así que no hace falta ningún
+     * cálculo de "dar la vuelta".
      *
      * Si en el camino la ficha pisa el nodo de Salida (de paso o para
      * quedarse), cobra el premio.
@@ -266,10 +258,10 @@ public class Juego {
     }
 
     /**
-     * Cuenta cuantos pasos hacia adelante hay desde donde esta el jugador
-     * hasta la casilla con ese id, caminando por los nodos. Si ya esta ahi, 0.
+     * Cuenta cuántos pasos hacia adelante hay desde donde está el jugador
+     * hasta la casilla con ese id, caminando por los nodos. Si ya está ahí, 0.
      * Como la lista es circular, se limita a una vuelta: si en una vuelta no
-     * aparece, la casilla no existe (y sin el limite el ciclo no terminaria).
+     * aparece, la casilla no existe (y sin el límite el ciclo no terminaría).
      */
     private int pasosHasta(Jugador jugador, int idDestino) {
         Nodo<Casilla> actual = tablero.obtenerNodo(jugador.getPosicionActual());
@@ -282,7 +274,7 @@ public class Juego {
         throw new IllegalArgumentException("No existe la casilla " + idDestino);
     }
 
-    // Lo que pasa al caer en la casilla donde quedo el jugador
+    // Lo que pasa al caer en la casilla donde quedó el jugador
     private void resolverCasilla(Jugador jugador, StringBuilder log) {
         Casilla casilla = tablero.obtenerCasilla(jugador.getPosicionActual());
 
@@ -294,7 +286,7 @@ public class Juego {
 
             int alquiler = propiedad.calcularAlquiler();
             if (jugador.getSaldo() < alquiler) {
-                // No le alcanza: la bancarrota es inmediata, no se espera ningun pago
+                // No le alcanza: la bancarrota es inmediata, no se espera ningún pago
                 declararBancarrota(jugador, propietario, TipoTransaccion.PAGO_ALQUILER,
                         "Alquiler de " + propiedad.getNombre(), alquiler, log);
             } else {
@@ -334,12 +326,12 @@ public class Juego {
     // =========================================================
 
     // Saca la carta del frente, la aplica y la mete al final.
-    // "Salga de la carcel" es la excepcion: el jugador se la queda.
+    // "Salga de la cárcel" es la excepción: el jugador se la queda.
     private void tomarCarta(Jugador jugador, CasillaEvento.Tipo tipoMazo, StringBuilder log) {
         ColaCircular<CartaEvento> mazo = mazoDe(tipoMazo);
         CartaEvento carta = mazo.desencolar();
         if (carta == null) {
-            // No deberia pasar: solo la carta de carcel sale del mazo sin volver
+            // No debería pasar: solo la carta de cárcel sale del mazo sin volver
             log.append("\nEl mazo está vacío.");
             return;
         }
@@ -353,7 +345,7 @@ public class Juego {
             mazo.encolar(carta);
         }
 
-        // Confirma el efecto en plata para que se vea que la carta se aplico
+        // Confirma el efecto en plata para que se vea que la carta se aplicó
         if (jugador.getSaldo() != saldoAntes) {
             log.append("\nSaldo de ").append(jugador.getNombre()).append(": ₡").append(saldoAntes)
                     .append(" → ₡").append(jugador.getSaldo()).append(".");
@@ -377,7 +369,7 @@ public class Juego {
             }
 
             case COBRAR_A_CADA_JUGADOR -> {
-                // Aqui el que puede quebrar es otro jugador, fuera de su turno
+                // Aquí el que puede quebrar es otro jugador, fuera de su turno
                 for (Jugador otro : jugadoresEnOrdenDeTurno()) {
                     if (otro == jugador || !otro.isActivo()) continue;
                     if (otro.getSaldo() < valor) {
@@ -392,7 +384,7 @@ public class Juego {
                 for (Jugador otro : jugadoresEnOrdenDeTurno()) {
                     if (otro == jugador || !otro.isActivo()) continue;
                     if (jugador.getSaldo() < valor) {
-                        // Le paga lo que le quede a este, y los demas ya no reciben nada
+                        // Le paga lo que le quede a este, y los demás ya no reciben nada
                         declararBancarrota(jugador, otro, TipoTransaccion.PAGO_ENTRE_JUGADORES, texto, valor, log);
                         break;
                     }
@@ -401,7 +393,7 @@ public class Juego {
             }
 
             case IR_A_CASILLA -> {
-                // Siempre hacia adelante: si la casilla quedo atras, da la vuelta y cobra Salida
+                // Siempre hacia adelante: si la casilla quedó atrás, da la vuelta y cobra Salida
                 avanzar(jugador, pasosHasta(jugador, valor), log);
                 resolverCasilla(jugador, log);
             }
@@ -419,7 +411,7 @@ public class Juego {
             }
 
             case RETROCEDER -> {
-                // Aqui se usa el puntero anterior de la lista circular doble.
+                // Aquí se usa el puntero anterior de la lista circular doble.
                 // Retroceder nunca cobra Salida, aunque cruce la casilla 0.
                 Nodo<Casilla> nodo = tablero.retroceder(
                         tablero.obtenerNodo(jugador.getPosicionActual()), valor);
@@ -437,7 +429,7 @@ public class Juego {
                     log.append("\n").append(jugador.getNombre()).append(" guarda la carta para usarla después.");
                     return true;
                 }
-                return false; // ya tiene 2 (no deberia pasar): vuelve al mazo
+                return false; // ya tiene 2 (no debería pasar): vuelve al mazo
             }
 
             case REPARACIONES -> {
@@ -471,21 +463,21 @@ public class Juego {
 
     /**
      * Termina el turno: el jugador del frente sale de la cola y, si sigue
-     * activo, vuelve a entrar al final. Asi el siguiente queda al frente.
+     * activo, vuelve a entrar al final. Así el siguiente queda al frente.
      *
      * <pre>
      *   antes:   frente → [Ana, Beto, Caro, Dani]
-     *   despues: frente → [Beto, Caro, Dani, Ana]
+     *   después: frente → [Beto, Caro, Dani, Ana]
      *
-     *   si Ana quebro en su turno, simplemente no se vuelve a encolar:
-     *   despues: frente → [Beto, Caro, Dani]
+     *   si Ana quebró en su turno, simplemente no se vuelve a encolar:
+     *   después: frente → [Beto, Caro, Dani]
      * </pre>
      *
      * Si al que le toca tiene un turno por perder, lo gasta y se pasa al
      * siguiente. Un turno perdido no suma al contador global.
      *
-     * @return los avisos del cambio de turno (por ejemplo, quien perdio su
-     *         turno); vacio si no hubo nada especial
+     * @return los avisos del cambio de turno (por ejemplo, quién perdió su
+     *         turno); vacío si no hubo nada especial
      */
     public synchronized String terminarTurnoActual() {
         if (terminado) return "";
@@ -506,7 +498,7 @@ public class Juego {
             return log.toString();
         }
 
-        // Cada jugador gasta como mucho un turno perdido por vuelta, asi que el ciclo termina
+        // Cada jugador gasta como mucho un turno perdido por vuelta, así que el ciclo termina
         while (turnos.verFrente().consumirTurnoPerdido()) {
             if (log.length() > 0) log.append("\n");
             log.append(turnos.verFrente().getNombre()).append(" pierde este turno.");
@@ -521,9 +513,9 @@ public class Juego {
     }
 
     /**
-     * Saca de la cola a un jugador que no esta al frente (quebro fuera de
+     * Saca de la cola a un jugador que no está al frente (quebró fuera de
      * su turno). Se da una vuelta completa a la cola y se vuelven a encolar
-     * todos menos el. El orden de los demas no cambia.
+     * todos menos él. El orden de los demás no cambia.
      */
     private void sacarDeLaCola(Jugador eliminado) {
         int cantidad = turnos.tamaño();
@@ -554,14 +546,14 @@ public class Juego {
 
     /**
      * Cobra el alquiler pendiente al jugador en turno y se lo da al dueño.
-     * Si en el camino el saldo dejo de alcanzar, es bancarrota.
+     * Si en el camino el saldo dejó de alcanzar, es bancarrota.
      *
-     * @return lo que paso, para mostrarlo a los jugadores
-     * @throws IllegalStateException si no hay ningun alquiler pendiente
+     * @return lo que pasó, para mostrarlo a los jugadores
+     * @throws IllegalStateException si no hay ningún alquiler pendiente
      */
     public synchronized String pagarAlquilerPendiente() {
         if (alquilerPendiente == null) {
-            throw new IllegalStateException("No hay ningun alquiler pendiente");
+            throw new IllegalStateException("No hay ningún alquiler pendiente");
         }
         Propiedad propiedad = alquilerPendiente;
         alquilerPendiente = null;
@@ -596,8 +588,8 @@ public class Juego {
      * turno (terminarTurnoActual no lo vuelve a encolar). Si no es el del
      * turno, sale de la cola de una vez.
      *
-     * @param acreedor a quien le debia (null = el banco)
-     * @param monto    lo que debia pagar, solo para el mensaje
+     * @param acreedor a quién le debía (null = el banco)
+     * @param monto    lo que debía pagar, solo para el mensaje
      */
     private void declararBancarrota(Jugador deudor, Jugador acreedor, TipoTransaccion tipo,
             String motivo, int monto, StringBuilder log) {
@@ -605,7 +597,7 @@ public class Juego {
         deudor.setActivo(false);
         deudor.liberarDeCarcel();
 
-        // Sus cartas "Salga de la carcel" vuelven a su mazo
+        // Sus cartas "Salga de la cárcel" vuelven a su mazo
         CartaEvento carta;
         while ((carta = deudor.usarCartaSalirCarcel()) != null) {
             mazoDe(carta.getMazo()).encolar(carta);
@@ -659,7 +651,7 @@ public class Juego {
         return ganador;
     }
 
-    /** @return true si el ganador empato en patrimonio con otro jugador */
+    /** @return true si el ganador empató en patrimonio con otro jugador */
     public synchronized boolean hayEmpate() {
         return hayEmpate;
     }
@@ -670,7 +662,7 @@ public class Juego {
      *
      * Una cola solo deja ver el frente. Para ver a todos se da una vuelta
      * completa: se saca cada jugador del frente, se anota y se vuelve a meter
-     * al final. Despues de tamaño() vueltas la cola queda exactamente igual.
+     * al final. Después de tamaño() vueltas la cola queda exactamente igual.
      */
     private Jugador[] jugadoresEnOrdenDeTurno() {
         Jugador[] jugadores = new Jugador[turnos.tamaño()];
@@ -692,22 +684,23 @@ public class Juego {
         return activos;
     }
 
-    // Retorna el jugador que tiene el turno actual: el del frente de la cola
+    // =========================================================
+    // CONSULTAS
+    // =========================================================
+
+    /** @return el jugador que tiene el turno: el del frente de la cola */
     public synchronized Jugador getJugadorActual() {
         return turnos.verFrente();
     }
 
-    // Retorna true si la partida ya finalizo
     public boolean esFinDeJuego() {
         return terminado;
     }
 
-    // Retorna la instancia del banco
     public Banco getBanco() {
         return banco;
     }
 
-    // Retorna el tablero del juego
     public Tablero getTablero() {
         return tablero;
     }
@@ -720,7 +713,7 @@ public class Juego {
         return mazoSuerte;
     }
 
-    // Retorna el contador del turno global
+    /** @return cuántos turnos se han jugado en la partida (empieza en 1) */
     public int getTurnoActualGlobal() {
         return turnoActualGlobal;
     }
@@ -729,7 +722,7 @@ public class Juego {
         return registro;
     }
 
-    public java.nio.file.Path getArchivoTransacciones() {
+    public Path getArchivoTransacciones() {
         return registro.getArchivo();
     }
 

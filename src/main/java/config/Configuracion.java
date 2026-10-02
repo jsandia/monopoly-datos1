@@ -45,9 +45,6 @@ public final class Configuracion {
     // TABLERO Y CÁRCEL
     // =========================================================
 
-    /** Casillas del tablero clásico. */
-    public static final int CASILLAS_TABLERO = 40;
-
     /** Índice de la casilla "Cárcel / De visita". */
     public static final int POSICION_CARCEL = 10;
 
@@ -80,9 +77,6 @@ public final class Configuracion {
 
     /** Puerto UDP para que los clientes encuentren al servidor en la red. */
     public static final int PUERTO_DESCUBRIMIENTO = 5001;
-
-    /** Puerto de PruebaConexion. Distinto de todos los anteriores para no chocar. */
-    public static final int PUERTO_PRUEBA_CONEXION = 5060;
 
     /** Cuánto espera un cliente buscando al servidor antes de rendirse. */
     public static final int TIEMPO_DESCUBRIMIENTO_MS = 5000;

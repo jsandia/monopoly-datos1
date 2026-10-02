@@ -4,58 +4,81 @@ import estructuras.ListaSimple;
 import estructuras.NodoSimple;
 
 /**
- * Clase Jugador
- * Representa a cada participante dentro del juego.
- * Mantiene la informacion de saldo, posicion y sus propiedades.
+ * Un participante de la partida: su saldo, su posición, sus propiedades,
+ * su tarjeta RFID y su situación en la cárcel.
  *
- * La posicion es solo el id de la casilla donde esta la ficha. Quien la
+ * La posición es solo el id de la casilla donde está la ficha. Quien la
  * mueve es Juego, caminando por los nodos del Tablero.
  */
 public class Jugador {
 
-    // Atributos basicos del jugador
-    private String id;
-    private String nombre;
+    private final String id;
+    private final String nombre;
     private int saldo;
     private int posicionActual;
-    private boolean activo;
+    private boolean activo;          // false = quedó en bancarrota
+    private String uidTarjeta;       // tarjeta RFID que lo identifica (null = sin tarjeta)
 
-    // Tarjeta RFID asociada a este jugador.
-    private String uidTarjeta;
+    // Sus propiedades, en el orden en que las compró. ListaSimple porque
+    // solo se agregan y se recorren.
+    private final ListaSimple<Propiedad> propiedades = new ListaSimple<>();
 
-    // Sus propiedades, en el orden en que las compro. ListaSimple porque
-    // solo se agrega, se recorre y, a lo sumo, se quita una.
-    private final ListaSimple<Propiedad> propiedades;
-
-    // Carcel: si esta preso y cuantas veces ha tirado sin sacar dobles
+    // Cárcel: si está preso y cuántas veces ha tirado sin sacar dobles
     private boolean enCarcel;
     private int turnosEnCarcel;
 
-    // Cartas "Salga de la carcel" que se guardo. Maximo 2: hay una en cada mazo.
+    // Cartas "Salga de la cárcel" guardadas. Máximo 2: hay una en cada mazo.
     // Se guarda la carta misma (no solo un contador) para devolverla a su mazo al usarla.
     private final CartaEvento[] cartasSalirCarcel = new CartaEvento[2];
 
-    // Turnos que le faltan por perder (carta "pierda su proximo turno")
+    // Turnos que le faltan por perder (carta "pierda su próximo turno")
     private int turnosPorPerder;
 
-    // Constructor principal del jugador
     public Jugador(String id, String nombre, int saldoInicial) {
         this.id = id;
         this.nombre = nombre;
         this.saldo = saldoInicial;
         this.posicionActual = 0;
         this.activo = true;
-        this.uidTarjeta = null;
-        this.propiedades = new ListaSimple<>();
+    }
+
+    // =========================================================
+    // DINERO
+    // =========================================================
+
+    /** Suma dinero al saldo. Los montos que no son positivos se ignoran. */
+    public void acreditar(int monto) {
+        if (monto > 0) {
+            saldo += monto;
+        }
+    }
+
+    /**
+     * Resta dinero si le alcanza.
+     *
+     * @return false si el monto no es positivo o si no le alcanza el saldo
+     */
+    public boolean debitar(int monto) {
+        if (monto <= 0 || monto > saldo) {
+            return false;
+        }
+        saldo -= monto;
+        return true;
+    }
+
+    /** Patrimonio = saldo + precio de compra de todas sus propiedades. */
+    public int calcularPatrimonio() {
+        return saldo + calcularValorPropiedades();
     }
 
     // =========================================================
     // TARJETA RFID
     // =========================================================
 
+    /** Asocia la tarjeta al jugador. El UID se guarda en mayúsculas. */
     public void registrarTarjeta(String uid) {
-        if (uid != null && !uid.trim().isEmpty()) {
-            this.uidTarjeta = uid.trim().toUpperCase();
+        if (uid != null && !uid.isBlank()) {
+            uidTarjeta = uid.trim().toUpperCase();
         }
     }
 
@@ -64,33 +87,82 @@ public class Jugador {
     }
 
     public boolean tieneTarjetaRegistrada() {
-        return uidTarjeta != null && !uidTarjeta.isEmpty();
+        return uidTarjeta != null;
     }
 
+    /** @return true si esa tarjeta es la de este jugador (sin importar mayúsculas) */
     public boolean validarTarjeta(String uid) {
-        return uidTarjeta != null
-                && uid != null
-                && uidTarjeta.equalsIgnoreCase(uid.trim());
+        return uidTarjeta != null && uid != null && uidTarjeta.equalsIgnoreCase(uid.trim());
     }
 
-    // Suma un monto al saldo del jugador
-    public void acreditar(int monto) {
-        if (monto > 0) {
-            this.saldo += monto;
+    // =========================================================
+    // PROPIEDADES (ListaSimple<Propiedad>)
+    // =========================================================
+
+    /** Agrega una propiedad comprada al final de su lista, sin repetirla. */
+    public void agregarPropiedad(Propiedad propiedad) {
+        if (propiedad != null && !propiedades.contiene(propiedad)) {
+            propiedades.agregarAlFinal(propiedad);
         }
     }
 
-    // Resta dinero si cuenta con suficiente saldo
-    public boolean debitar(int monto) {
-        if (monto <= this.saldo) {
-            this.saldo -= monto;
-            return true;
-        }
-        return false;
+    public int getCantidadPropiedades() {
+        return propiedades.tamaño();
     }
 
     /**
-     * Le cuenta a cada una de sus propiedades cuantas casillas camino, para
+     * Entrega todas sus propiedades (por bancarrota) y deja su lista vacía.
+     * Primero se copian a un arreglo recorriendo los nodos, y después se
+     * vacía la lista: así quien las recibe no depende de los nodos borrados.
+     */
+    public Propiedad[] entregarTodasLasPropiedades() {
+        Propiedad[] entregadas = new Propiedad[propiedades.tamaño()];
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        for (int i = 0; actual != null; i++) {
+            entregadas[i] = actual.getDato();
+            actual = actual.getSiguiente();
+        }
+        propiedades.vaciar();
+        return entregadas;
+    }
+
+    /** Suma el precio de compra de todas sus propiedades. */
+    public int calcularValorPropiedades() {
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            total += actual.getDato().getPrecioCompra();
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    /** Total de casas en todas sus propiedades (para las cartas de reparaciones). */
+    public int contarCasas() {
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            total += actual.getDato().getCantidadCasas();
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    /** Cuántas de sus propiedades tienen hotel (para las cartas de reparaciones). */
+    public int contarHoteles() {
+        int total = 0;
+        NodoSimple<Propiedad> actual = propiedades.getPrimero();
+        while (actual != null) {
+            if (actual.getDato().tieneHotel()) {
+                total++;
+            }
+            actual = actual.getSiguiente();
+        }
+        return total;
+    }
+
+    /**
+     * Le cuenta a cada una de sus propiedades cuántas casillas caminó, para
      * la regla de "una vuelta desde la compra antes de construir". Juego lo
      * llama al avanzar (pasos positivos) y al retroceder (negativos).
      */
@@ -107,25 +179,25 @@ public class Jugador {
     }
 
     // =========================================================
-    // CARCEL
+    // CÁRCEL
     // =========================================================
 
-    // Lo pone preso en la casilla de la carcel. No usa mover(), asi que no cobra Salida.
+    /** Lo pone preso en la casilla de la cárcel. No camina, así que no cobra Salida. */
     public void enviarACarcel(int posicionCarcel) {
-        this.posicionActual = posicionCarcel;
-        this.enCarcel = true;
-        this.turnosEnCarcel = 0;
+        posicionActual = posicionCarcel;
+        enCarcel = true;
+        turnosEnCarcel = 0;
     }
 
-    // Sale de la carcel; se queda en la misma casilla ("de visita")
+    /** Sale de la cárcel y se queda en la misma casilla ("de visita"). */
     public void liberarDeCarcel() {
-        this.enCarcel = false;
-        this.turnosEnCarcel = 0;
+        enCarcel = false;
+        turnosEnCarcel = 0;
     }
 
-    // Suma un intento fallido de sacar dobles
+    /** Suma un intento fallido de sacar dobles. */
     public void sumarIntentoCarcel() {
-        this.turnosEnCarcel++;
+        turnosEnCarcel++;
     }
 
     public boolean isEnCarcel() {
@@ -136,7 +208,7 @@ public class Jugador {
         return turnosEnCarcel;
     }
 
-    // Guarda una carta "Salga de la carcel". Devuelve false si ya tiene 2.
+    /** Guarda una carta "Salga de la cárcel". @return false si ya tiene 2 */
     public boolean guardarCartaSalirCarcel(CartaEvento carta) {
         for (int i = 0; i < cartasSalirCarcel.length; i++) {
             if (cartasSalirCarcel[i] == null) {
@@ -147,7 +219,7 @@ public class Jugador {
         return false;
     }
 
-    // Entrega una de sus cartas para usarla (y devolverla al mazo). null si no tiene.
+    /** Entrega una de sus cartas para usarla (y devolverla al mazo). @return null si no tiene */
     public CartaEvento usarCartaSalirCarcel() {
         for (int i = 0; i < cartasSalirCarcel.length; i++) {
             if (cartasSalirCarcel[i] != null) {
@@ -173,7 +245,7 @@ public class Jugador {
     // TURNOS PERDIDOS
     // =========================================================
 
-    // La carta "pierda su proximo turno" suma uno
+    /** La carta "pierda su próximo turno" suma uno. */
     public void perderProximoTurno() {
         turnosPorPerder++;
     }
@@ -195,78 +267,9 @@ public class Jugador {
     }
 
     // =========================================================
-    // PROPIEDADES (ListaSimple<Propiedad>)
+    // DATOS BÁSICOS
     // =========================================================
 
-    // Agrega una propiedad comprada al final de su lista, sin repetirla
-    public void agregarPropiedad(Propiedad propiedad) {
-        if (propiedad != null && !propiedades.contiene(propiedad)) {
-            propiedades.agregarAlFinal(propiedad);
-        }
-    }
-
-    /**
-     * Entrega todas sus propiedades (por bancarrota) y deja su lista vacia.
-     * Primero se copian a un arreglo recorriendo los nodos, y despues se
-     * vacia la lista: asi quien las recibe no depende de los nodos borrados.
-     */
-    public Propiedad[] entregarTodasLasPropiedades() {
-        Propiedad[] entregadas = new Propiedad[propiedades.tamaño()];
-        NodoSimple<Propiedad> actual = propiedades.getPrimero();
-        for (int i = 0; actual != null; i++) {
-            entregadas[i] = actual.getDato();
-            actual = actual.getSiguiente();
-        }
-        propiedades.vaciar();
-        return entregadas;
-    }
-
-    // Suma el precio de compra de todas sus propiedades
-    public int calcularValorPropiedades() {
-        int total = 0;
-        NodoSimple<Propiedad> actual = propiedades.getPrimero();
-        while (actual != null) {
-            total += actual.getDato().getPrecioCompra();
-            actual = actual.getSiguiente();
-        }
-        return total;
-    }
-
-    // Total de casas en todas sus propiedades (para las cartas de reparaciones)
-    public int contarCasas() {
-        int total = 0;
-        NodoSimple<Propiedad> actual = propiedades.getPrimero();
-        while (actual != null) {
-            total += actual.getDato().getCantidadCasas();
-            actual = actual.getSiguiente();
-        }
-        return total;
-    }
-
-    // Cuantas de sus propiedades tienen hotel (para las cartas de reparaciones)
-    public int contarHoteles() {
-        int total = 0;
-        NodoSimple<Propiedad> actual = propiedades.getPrimero();
-        while (actual != null) {
-            if (actual.getDato().tieneHotel()) {
-                total++;
-            }
-            actual = actual.getSiguiente();
-        }
-        return total;
-    }
-
-    // Suma el dinero disponible mas el valor de las propiedades
-    public int calcularPatrimonio() {
-        return saldo + calcularValorPropiedades();
-    }
-
-    // Devuelve cuantas propiedades posee
-    public int getCantidadPropiedades() {
-        return propiedades.tamaño();
-    }
-
-    // Getters y Setters
     public String getId() {
         return id;
     }

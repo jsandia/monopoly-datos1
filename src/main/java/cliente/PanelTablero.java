@@ -434,7 +434,7 @@ public class PanelTablero extends JPanel {
     private String detalleDe(Casilla casilla) {
         if (casilla instanceof Propiedad p) {
             Mensaje.EstadoPropiedad estado = propiedades[p.getId()];
-            return estado != null && estado.propietario() >= 0 ? "Renta ₡" + estado.renta() : "₡" + p.getPrecio();
+            return estado != null && estado.propietario() >= 0 ? "Renta ₡" + estado.renta() : "₡" + p.getPrecioCompra();
         }
         if (casilla instanceof CasillaEvento ev) return ev.getTipo() == CasillaEvento.Tipo.SUERTE ? "?" : "▣";
         if (casilla instanceof CasillaEspecial esp) {

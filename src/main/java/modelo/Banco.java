@@ -1,455 +1,161 @@
 package modelo;
+
 import config.Configuracion;
+
 /**
- * Clase Banco
+ * El banco del juego: tiene su propio dinero, las casas y los hoteles que
+ * todavía no se han construido, y hace todas las operaciones de dinero.
  *
- * Representa el banco del juego Monopoly CR.
+ * Cada operación primero valida y, solo si todo está bien, mueve el dinero
+ * y registra la transacción. Si algo falla devuelve false y no cambia nada.
  *
- * El banco administra:
- *
- * - Dinero
- * - Casas
- * - Hoteles
- * - Compra de propiedades
- * - Alquileres
- * - Impuestos
- * - Pago por pasar por la salida
- * - Compra de casas y hoteles
+ * Los métodos públicos son synchronized: los usan varios hilos del servidor.
  */
 public class Banco {
 
-    // =========================================================
-    // ATRIBUTOS
-    // =========================================================
-
     private int saldo;
-    private RegistroTransacciones registro;
+    private int casasDisponibles;
+    private int hotelesDisponibles;
+    private RegistroTransacciones registro; // null = no se registra (algunas pruebas)
+
+    /** Crea un banco con el dinero, las casas y los hoteles de Configuracion. */
+    public Banco() {
+        this(Configuracion.SALDO_BANCO, Configuracion.CASAS_BANCO, Configuracion.HOTELES_BANCO);
+    }
+
+    /** Crea un banco con cantidades propias. Los valores negativos se toman como 0. */
+    public Banco(int saldoInicial, int casasIniciales, int hotelesIniciales) {
+        this.saldo = Math.max(0, saldoInicial);
+        this.casasDisponibles = Math.max(0, casasIniciales);
+        this.hotelesDisponibles = Math.max(0, hotelesIniciales);
+    }
 
     public synchronized void setRegistroTransacciones(RegistroTransacciones registro) {
         this.registro = registro;
     }
 
-    private void registrar(Jugador jugador, TipoTransaccion tipo, String detalle, int anterior) {
-        if (registro == null) return;
-        int diferencia = jugador.getSaldo() - anterior;
-        // El movimiento del banco es el inverso del movimiento del jugador.
-        int bancoAnterior = saldo + diferencia;
-        if (diferencia > 0) {
-            registro.registrar(tipo, null, jugador, diferencia, detalle,
-                    bancoAnterior, saldo, anterior, jugador.getSaldo());
-        } else if (diferencia < 0) {
-            registro.registrar(tipo, jugador, null, -(long) diferencia, detalle,
-                    anterior, jugador.getSaldo(), bancoAnterior, saldo);
-        }
-    }
-
-
-    // Cantidad de casas que tiene disponibles el banco.
-    private int casasDisponibles;
-
-    // Cantidad de hoteles que tiene disponibles el banco.
-    private int hotelesDisponibles;
-
-
-    // =========================================================
-    // CONSTRUCTOR
-    // =========================================================
-
-    /**
-     * Crea un banco con los valores iniciales del juego.
-     *
-     * Los valores (dinero, casas y hoteles) están en Configuracion.
-     */
-    public Banco() {
-
-        this.saldo = Configuracion.SALDO_BANCO;
-        this.casasDisponibles = Configuracion.CASAS_BANCO;
-        this.hotelesDisponibles = Configuracion.HOTELES_BANCO;
-    }
-
-
-    /**
-     * Constructor para crear un banco
-     * con cantidades personalizadas.
-     */
-    public Banco(
-            int saldoInicial,
-            int casasIniciales,
-            int hotelesIniciales
-    ) {
-
-        if (saldoInicial >= 0) {
-            this.saldo = saldoInicial;
-        } else {
-            this.saldo = 0;
-        }
-
-        if (casasIniciales >= 0) {
-            this.casasDisponibles = casasIniciales;
-        } else {
-            this.casasDisponibles = 0;
-        }
-
-        if (hotelesIniciales >= 0) {
-            this.hotelesDisponibles = hotelesIniciales;
-        } else {
-            this.hotelesDisponibles = 0;
-        }
-    }
-
-
-    // =========================================================
-    // GETTERS
-    // =========================================================
-
-    /**
-     * Devuelve el dinero disponible del banco.
-     */
     public int getSaldo() {
         return saldo;
     }
 
-
-    /**
-     * Devuelve la cantidad de casas disponibles.
-     */
     public int getCasasDisponibles() {
         return casasDisponibles;
     }
 
-
-    /**
-     * Devuelve la cantidad de hoteles disponibles.
-     */
     public int getHotelesDisponibles() {
         return hotelesDisponibles;
     }
 
-
     // =========================================================
-    // DINERO DEL BANCO
+    // PAGOS ENTRE EL BANCO Y UN JUGADOR
     // =========================================================
 
-    /**
-     * Hace que el banco reciba dinero.
-     */
-    public synchronized void recibirDinero(int monto) {
-
-        if (monto > 0) {
-            saldo += monto;
-        }
+    /** El banco le paga al jugador al pasar por Salida. */
+    public synchronized boolean pagarSalida(Jugador jugador, int monto) {
+        return pagarJugador(jugador, monto, TipoTransaccion.PREMIO_INICIO, "Premio por pasar por inicio");
     }
 
-
-    /**
-     * Hace que el banco entregue dinero.
-     *
-     * Retorna true si pudo entregar el dinero.
-     * Retorna false si el monto es inválido
-     * o el banco no tiene suficiente.
-     */
-    public synchronized boolean entregarDinero(int monto) {
-
-        if (monto <= 0) {
-            return false;
-        }
-
-        if (monto > saldo) {
-            return false;
-        }
-
-        saldo -= monto;
-
-        return true;
+    /** El jugador le paga un impuesto al banco. */
+    public synchronized boolean cobrarImpuesto(Jugador jugador, int impuesto) {
+        return cobrarJugador(jugador, impuesto, TipoTransaccion.PAGO_AL_BANCO, "Pago de impuesto");
     }
 
+    /** El jugador le paga al banco la multa para salir de la cárcel. */
+    public synchronized boolean cobrarMultaCarcel(Jugador jugador, int multa) {
+        return cobrarJugador(jugador, multa, TipoTransaccion.PAGO_AL_BANCO, "Multa para salir de la cárcel");
+    }
 
-    // =========================================================
-    // PAGAR A JUGADOR
-    // =========================================================
+    /** Carta de evento a favor del jugador: le paga el banco. */
+    public synchronized boolean pagarGananciaEvento(Jugador jugador, int monto, String descripcion) {
+        return descripcion != null
+                && pagarJugador(jugador, monto, TipoTransaccion.GANANCIA_EVENTO, descripcion);
+    }
 
+    /** Carta de evento en contra del jugador: le paga al banco. */
+    public synchronized boolean cobrarPerdidaEvento(Jugador jugador, int monto, String descripcion) {
+        return descripcion != null
+                && cobrarJugador(jugador, monto, TipoTransaccion.PERDIDA_EVENTO, descripcion);
+    }
+
+    // El banco le da dinero al jugador, si al banco le alcanza
     private boolean pagarJugador(Jugador jugador, int monto, TipoTransaccion tipo, String descripcion) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (monto <= 0) {
-            return false;
-        }
-
-        if (!entregarDinero(monto)) {
-            return false;
-        }
-
+        if (jugador == null || monto <= 0 || monto > saldo) return false;
+        int anterior = jugador.getSaldo();
+        saldo -= monto;
         jugador.acreditar(monto);
-
-        registrar(jugador, tipo, descripcion, saldoAnterior);
-
+        registrar(jugador, tipo, descripcion, anterior);
         return true;
     }
 
-
-    // =========================================================
-    // COBRAR A JUGADOR
-    // =========================================================
-
-    /**
-     * El banco cobra dinero a un jugador.
-     */
-    public synchronized boolean cobrarJugador(Jugador jugador, int monto) {
-        return cobrarJugador(jugador, monto, TipoTransaccion.PAGO_AL_BANCO, "Banco");
-    }
-
+    // El jugador le da dinero al banco, si al jugador le alcanza
     private boolean cobrarJugador(Jugador jugador, int monto, TipoTransaccion tipo, String descripcion) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (monto <= 0) {
-            return false;
-        }
-
-        if (!jugador.debitar(monto)) {
-            return false;
-        }
-
-        recibirDinero(monto);
-
-        registrar(jugador, tipo, descripcion, saldoAnterior);
-
-        return true;
-    }
-
-
-    // =========================================================
-    // SALIDA
-    // =========================================================
-
-    /**
-     * Paga al jugador cuando pasa por la casilla de salida.
-     */
-    public synchronized boolean pagarSalida(
-            Jugador jugador,
-            int monto
-    ) {
-
-        if (jugador == null || monto <= 0 || !entregarDinero(monto)) return false;
+        if (jugador == null || monto <= 0) return false;
         int anterior = jugador.getSaldo();
-        jugador.acreditar(monto);
-        registrar(jugador, TipoTransaccion.PREMIO_INICIO, "Premio por pasar por inicio", anterior);
+        if (!jugador.debitar(monto)) return false;
+        saldo += monto;
+        registrar(jugador, tipo, descripcion, anterior);
         return true;
     }
 
-
-    // =========================================================
-    // IMPUESTOS
-    // =========================================================
-
     /**
-     * Cobra un impuesto al jugador.
+     * Registra un movimiento entre el banco y un jugador. Si el saldo del
+     * jugador subió, el banco fue el origen; si bajó, fue el destino.
      */
-    public synchronized boolean cobrarImpuesto(
-            Jugador jugador,
-            int impuesto
-    ) {
-
-        if (jugador == null || impuesto <= 0) return false;
-        int anterior = jugador.getSaldo();
-        if (!jugador.debitar(impuesto)) return false;
-        recibirDinero(impuesto);
-        registrar(jugador, TipoTransaccion.PAGO_AL_BANCO, "Pago de impuesto", anterior);
-        return true;
+    private void registrar(Jugador jugador, TipoTransaccion tipo, String descripcion, int anterior) {
+        if (registro == null) return;
+        int diferencia = jugador.getSaldo() - anterior;
+        int bancoAnterior = saldo + diferencia; // el banco se movió al revés que el jugador
+        if (diferencia > 0) {
+            registro.registrar(tipo, null, jugador, diferencia, descripcion,
+                    bancoAnterior, saldo, anterior, jugador.getSaldo());
+        } else if (diferencia < 0) {
+            registro.registrar(tipo, jugador, null, -diferencia, descripcion,
+                    anterior, jugador.getSaldo(), bancoAnterior, saldo);
+        }
     }
 
-
     // =========================================================
-    // CARCEL
-    // =========================================================
-
-    /**
-     * Cobra la multa para salir de la cárcel.
-     */
-    public synchronized boolean cobrarMultaCarcel(
-            Jugador jugador,
-            int multa
-    ) {
-
-        return cobrarJugador(jugador, multa, TipoTransaccion.PAGO_AL_BANCO,
-                "Multa para salir de la cárcel");
-    }
-
-
-    // =========================================================
-    // COMPRA DE PROPIEDAD
+    // PROPIEDADES Y ALQUILERES
     // =========================================================
 
-    /**
-     * Permite que un jugador compre una propiedad.
-     *
-     * La propiedad debe estar libre.
-     */
-    public synchronized boolean comprarPropiedad(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        // La propiedad ya tiene dueño.
-        if (propiedad.tienePropietario()) {
-            return false;
-        }
-
-        int precio = propiedad.getPrecioCompra();
-
-        if (precio <= 0) {
-            return false;
-        }
-
-        // El jugador debe tener suficiente dinero.
-        if (!jugador.debitar(precio)) {
-            return false;
-        }
-
-        // El banco recibe el dinero.
-        recibirDinero(precio);
-
-        // Se asigna el dueño.
+    /** El jugador le compra al banco una propiedad sin dueño. */
+    public synchronized boolean comprarPropiedad(Jugador jugador, Propiedad propiedad) {
+        if (propiedad == null || propiedad.tienePropietario()) return false;
+        if (!cobrarJugador(jugador, propiedad.getPrecioCompra(),
+                TipoTransaccion.COMPRA_PROPIEDAD, propiedad.getNombre())) return false;
         propiedad.setPropietario(jugador);
-
-        // Se agrega la propiedad al jugador.
         jugador.agregarPropiedad(propiedad);
-
-        registrar(jugador, TipoTransaccion.COMPRA_PROPIEDAD, propiedad.getNombre(), saldoAnterior);
-
         return true;
     }
 
-
-    // =========================================================
-    // COBRAR ALQUILER
-    // =========================================================
-
     /**
-     * Cobra el alquiler cuando un jugador
-     * cae en la propiedad de otro jugador.
+     * El jugador le paga el alquiler al dueño de la propiedad. No hay pago si
+     * no tiene dueño, si es suya o si no le alcanza el saldo.
      */
-    public synchronized boolean cobrarAlquiler(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
+    public synchronized boolean cobrarAlquiler(Jugador jugador, Propiedad propiedad) {
+        if (jugador == null || propiedad == null) return false;
+        Jugador propietario = propiedad.getPropietario();
+        if (propietario == null || propietario == jugador) return false;
 
-
-        if (jugador == null) {
-            return false;
-        }
-
-        if (propiedad == null) {
-            return false;
-        }
-
-        Jugador propietario =
-                propiedad.getPropietario();
-
-        // La propiedad no tiene dueño.
-        if (propietario == null) {
-            return false;
-        }
-
-        // El jugador cayó en su propia propiedad.
-        if (propietario == jugador) {
-            return false;
-        }
-
-        int alquiler =
-                propiedad.calcularAlquiler();
-
-        if (alquiler <= 0) {
-            return false;
-        }
-
-        // El jugador debe poder pagar.
-        if (!jugador.debitar(alquiler)) {
-            return false;
-        }
-
-        // El dueño recibe el alquiler.
+        int alquiler = propiedad.calcularAlquiler();
+        int anteriorJugador = jugador.getSaldo();
+        int anteriorPropietario = propietario.getSaldo();
+        if (alquiler <= 0 || !jugador.debitar(alquiler)) return false;
         propietario.acreditar(alquiler);
 
         if (registro != null) {
             registro.registrar(TipoTransaccion.PAGO_ALQUILER, jugador, propietario, alquiler,
-                    "Alquiler de " + propiedad.getNombre(), saldoAnterior, jugador.getSaldo(),
-                    propietario.getSaldo() - alquiler, propietario.getSaldo());
+                    "Alquiler de " + propiedad.getNombre(), anteriorJugador, jugador.getSaldo(),
+                    anteriorPropietario, propietario.getSaldo());
         }
-
         return true;
     }
 
-
     // =========================================================
-    // COMPRAR CASA
-    // =========================================================
-
-    /**
-     * Permite que un jugador compre una casa.
-     */
-    public synchronized boolean comprarCasa(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-        if (motivoNoComprarCasa(jugador, propiedad) != null) return false;
-
-        int precio =
-                propiedad.getPrecioCasa();
-
-        // Quitamos el dinero.
-        if (!jugador.debitar(precio)) {
-            return false;
-        }
-
-        // Intentamos construir la casa.
-        if (!propiedad.agregarCasa()) {
-
-            // Si falla, devolvemos el dinero.
-            jugador.acreditar(precio);
-
-            return false;
-        }
-
-        // El banco recibe el dinero.
-        recibirDinero(precio);
-
-        // El banco entrega una casa.
-        casasDisponibles--;
-
-        registrar(jugador, TipoTransaccion.COMPRA_CASA, propiedad.getNombre(), saldoAnterior);
-
-        return true;
-    }
-
-
-    // =========================================================
-    // DISPONIBILIDAD DE CASAS
+    // CASAS Y HOTELES
     // =========================================================
 
-    /** Devuelve null si se permite la compra; de lo contrario, explica el motivo. */
+    /** @return null si el jugador puede comprar una casa ahí; si no, el motivo */
     public synchronized String motivoNoComprarCasa(Jugador jugador, Propiedad propiedad) {
         if (propiedad == null) return "Selecciona una propiedad válida.";
         String motivo = propiedad.motivoNoConstruir(jugador);
@@ -459,70 +165,16 @@ public class Banco {
         return null;
     }
 
-    // =========================================================
-    // COMPRAR HOTEL
-    // =========================================================
-
-    /**
-     * Permite que un jugador compre un hotel.
-     *
-     * Para construirlo debe tener exactamente
-     * cuatro casas.
-     */
-    public synchronized boolean comprarHotel(
-            Jugador jugador,
-            Propiedad propiedad
-    ) {
-        int saldoAnterior = jugador == null ? 0 : jugador.getSaldo();
-
-        if (motivoNoComprarHotel(jugador, propiedad) != null) return false;
-
-        int precio =
-                propiedad.getPrecioHotel();
-
-        if (precio <= 0) {
-            return false;
-        }
-
-        // El jugador debe poder pagar.
-        if (!jugador.debitar(precio)) {
-            return false;
-        }
-
-        // Construimos el hotel.
-        if (!propiedad.construirHotel()) {
-
-            // Si falla, devolvemos el dinero.
-            jugador.acreditar(precio);
-
-            return false;
-        }
-
-        // El banco recibe el dinero.
-        recibirDinero(precio);
-
-        /*
-         * El banco entrega un hotel.
-         */
-        hotelesDisponibles--;
-
-        /*
-         * Las cuatro casas que tenía la propiedad
-         * regresan al banco.
-         */
-        casasDisponibles += Configuracion.MAX_CASAS_POR_PROPIEDAD;
-
-        registrar(jugador, TipoTransaccion.COMPRA_HOTEL, propiedad.getNombre(), saldoAnterior);
-
+    /** Le vende una casa al jugador para esa propiedad. */
+    public synchronized boolean comprarCasa(Jugador jugador, Propiedad propiedad) {
+        if (motivoNoComprarCasa(jugador, propiedad) != null) return false;
+        cobrarJugador(jugador, propiedad.getPrecioCasa(), TipoTransaccion.COMPRA_CASA, propiedad.getNombre());
+        propiedad.agregarCasa();
+        casasDisponibles--;
         return true;
     }
 
-
-    // =========================================================
-    // DISPONIBILIDAD DE HOTELES
-    // =========================================================
-
-    /** null si se puede comprar; valida dueño, cuatro casas, saldo y existencias. */
+    /** @return null si el jugador puede comprar un hotel ahí; si no, el motivo */
     public synchronized String motivoNoComprarHotel(Jugador jugador, Propiedad propiedad) {
         if (propiedad == null) return "Selecciona una propiedad válida.";
         if (jugador == null || propiedad.getPropietario() != jugador) return "La propiedad no pertenece al jugador en turno.";
@@ -534,59 +186,21 @@ public class Banco {
         return null;
     }
 
-    // =========================================================
-    // BANCARROTA
-    // =========================================================
-
-    /**
-     * El deudor no alcanza a cubrir un pago obligatorio:
-     * 1. entrega todo el saldo que tenga al acreedor (null = el banco);
-     * 2. sus propiedades vuelven al banco sin dueño, y sus casas y hoteles
-     *    vuelven al inventario del banco.
-     *
-     * Marcarlo inactivo y sacarlo de los turnos le toca a Juego.
-     *
-     * @param tipo        tipo del pago que no pudo cubrir (alquiler, impuesto...)
-     * @param descripcion motivo del pago, para el historial
-     * @return cuanto dinero alcanzo a entregar
-     */
-    public synchronized int liquidarBancarrota(Jugador deudor, Jugador acreedor,
-            TipoTransaccion tipo, String descripcion) {
-        int entregado = deudor.getSaldo();
-        String detalle = descripcion + " (bancarrota)";
-
-        if (entregado > 0) {
-            deudor.debitar(entregado);
-            if (acreedor == null) {
-                recibirDinero(entregado);
-                registrar(deudor, tipo, detalle, entregado);
-            } else {
-                int anteriorAcreedor = acreedor.getSaldo();
-                acreedor.acreditar(entregado);
-                if (registro != null) {
-                    registro.registrar(tipo, deudor, acreedor, entregado, detalle,
-                            entregado, 0, anteriorAcreedor, acreedor.getSaldo());
-                }
-            }
-        }
-
-        for (Propiedad propiedad : deudor.entregarTodasLasPropiedades()) {
-            // Al comprar un hotel las 4 casas ya habian vuelto al banco:
-            // aqui solo regresa el hotel (o las casas sueltas que tenga)
-            if (propiedad.tieneHotel()) {
-                hotelesDisponibles++;
-            }
-            casasDisponibles += propiedad.getCantidadCasas();
-            propiedad.devolverAlBanco();
-        }
-        return entregado;
+    /** Le vende un hotel al jugador: reemplaza las 4 casas, que vuelven al banco. */
+    public synchronized boolean comprarHotel(Jugador jugador, Propiedad propiedad) {
+        if (motivoNoComprarHotel(jugador, propiedad) != null) return false;
+        cobrarJugador(jugador, propiedad.getPrecioHotel(), TipoTransaccion.COMPRA_HOTEL, propiedad.getNombre());
+        propiedad.construirHotel();
+        hotelesDisponibles--;
+        casasDisponibles += Configuracion.MAX_CASAS_POR_PROPIEDAD;
+        return true;
     }
 
     // =========================================================
-    // PAGOS ENTRE JUGADORES Y CARTAS DE EVENTO
+    // PAGOS ENTRE JUGADORES
     // =========================================================
 
-    /** Pago validado entre jugadores; una sola transaccion representa ambos movimientos. */
+    /** Un jugador le paga a otro. Una sola transacción representa los dos movimientos. */
     public synchronized boolean pagarEntreJugadores(Jugador origen, Jugador destino, int monto, String descripcion) {
         if (origen == null || destino == null || origen == destino || !origen.isActivo()
                 || !destino.isActivo() || monto <= 0 || descripcion == null
@@ -603,14 +217,50 @@ public class Banco {
         return true;
     }
 
-    /** Estas operaciones las invoca el servidor al resolver una carta de evento. */
-    public synchronized boolean pagarGananciaEvento(Jugador jugador, int monto, String descripcion) {
-        if (descripcion == null) return false;
-        return pagarJugador(jugador, monto, TipoTransaccion.GANANCIA_EVENTO, descripcion);
-    }
+    // =========================================================
+    // BANCARROTA
+    // =========================================================
 
-    public synchronized boolean cobrarPerdidaEvento(Jugador jugador, int monto, String descripcion) {
-        if (descripcion == null) return false;
-        return cobrarJugador(jugador, monto, TipoTransaccion.PERDIDA_EVENTO, descripcion);
+    /**
+     * El deudor no alcanza a cubrir un pago obligatorio:
+     * 1. entrega todo el saldo que tenga al acreedor (null = el banco);
+     * 2. sus propiedades vuelven al banco sin dueño, y sus casas y hoteles
+     *    vuelven al inventario del banco.
+     *
+     * Marcarlo inactivo y sacarlo de los turnos le toca a Juego.
+     *
+     * @param tipo        tipo del pago que no pudo cubrir (alquiler, impuesto...)
+     * @param descripcion motivo del pago, para el historial
+     * @return cuánto dinero alcanzó a entregar
+     */
+    public synchronized int liquidarBancarrota(Jugador deudor, Jugador acreedor,
+            TipoTransaccion tipo, String descripcion) {
+        int entregado = deudor.getSaldo();
+        String detalle = descripcion + " (bancarrota)";
+
+        if (entregado > 0) {
+            if (acreedor == null) {
+                cobrarJugador(deudor, entregado, tipo, detalle);
+            } else {
+                int anteriorAcreedor = acreedor.getSaldo();
+                deudor.debitar(entregado);
+                acreedor.acreditar(entregado);
+                if (registro != null) {
+                    registro.registrar(tipo, deudor, acreedor, entregado, detalle,
+                            entregado, 0, anteriorAcreedor, acreedor.getSaldo());
+                }
+            }
+        }
+
+        for (Propiedad propiedad : deudor.entregarTodasLasPropiedades()) {
+            // Al comprar un hotel las 4 casas ya habían vuelto al banco:
+            // aquí solo regresa el hotel (o las casas sueltas que tenga)
+            if (propiedad.tieneHotel()) {
+                hotelesDisponibles++;
+            }
+            casasDisponibles += propiedad.getCantidadCasas();
+            propiedad.devolverAlBanco();
+        }
+        return entregado;
     }
 }

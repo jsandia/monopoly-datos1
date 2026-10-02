@@ -214,7 +214,7 @@ public class VentanaTablero extends JFrame {
             Mensaje.EstadoPropiedad estado = ultimoEstado.propiedades()[p.getId()];
             if (estado != null) {
                 String propietario = estado.propietario() < 0 ? "Sin dueño" : ultimoEstado.nombres()[estado.propietario()];
-                areaDescripcion.setText("Grupo: " + p.getGrupo() + "\nPrecio: ₡" + p.getPrecio()
+                areaDescripcion.setText("Grupo: " + p.getGrupo() + "\nPrecio: ₡" + p.getPrecioCompra()
                         + "\nDueño: " + propietario + "\nRenta actual: ₡" + estado.renta()
                         + "\nCasas: " + estado.casas() + " | Hotel: " + (estado.hotel() ? "Sí" : "No")
                         + (p.esEdificable() ? "\nPrecio por casa: ₡" + estado.precioCasa()

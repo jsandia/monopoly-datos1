@@ -42,7 +42,7 @@ class TableroTest {
         Nodo<Casilla> primero = tablero.getPrimerNodo();
         Casilla ultima = primero.getAnterior().getDato();
         assertEquals("Santa Ana", ultima.getNombre());
-        assertEquals(400, ((Propiedad) ultima).getPrecio());
+        assertEquals(400, ((Propiedad) ultima).getPrecioCompra());
         assertSame(primero, primero.getAnterior().getSiguiente());
     }
 

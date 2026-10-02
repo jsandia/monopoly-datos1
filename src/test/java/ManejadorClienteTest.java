@@ -62,16 +62,15 @@ class ManejadorClienteTest {
 
         Mensaje.Respuesta repetido = (Mensaje.Respuesta) enviarYRecibir(new Mensaje.Registrarse("ana"));
         assertEquals("USER_EXISTS", repetido.tipo());
-
-        assertEquals(new Mensaje.Pong(123), enviarYRecibir(new Mensaje.Ping(123)));
     }
 
     @Test void ignoraMensajesQueSoloPuedeMandarElServidor() throws Exception {
         in.readObject(); // Bienvenida
         out.writeObject(new Mensaje.Aviso("un cliente no debería mandar esto"));
         out.flush();
-        // Sigue atendiendo normal: el siguiente Ping tiene respuesta
-        assertEquals(new Mensaje.Pong(7), enviarYRecibir(new Mensaje.Ping(7)));
+        // Sigue atendiendo normal: el siguiente mensaje tiene respuesta
+        Mensaje.Respuesta registro = (Mensaje.Respuesta) enviarYRecibir(new Mensaje.Registrarse("Ana"));
+        assertEquals("REGISTER_OK", registro.tipo());
     }
 
     @Test void alDesconectarseDejaDeRecibirMensajes() throws Exception {

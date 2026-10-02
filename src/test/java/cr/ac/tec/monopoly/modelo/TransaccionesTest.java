@@ -29,7 +29,7 @@ class TransaccionesTest {
     @Test
     void compraContieneTodosLosCamposYElTurno() throws Exception {
         registro.setTurno(7);
-        Propiedad propiedad = new Propiedad(1, "San José", "Grupo", 1000, 100);
+        Propiedad propiedad = new Propiedad(1, "San José", "Grupo", 1000, 100, new Tablero());
         assertTrue(banco.comprarPropiedad(ana, propiedad));
         Transaccion t = registro.getHistorial().desdeLaMasAntigua()[0];
         assertEquals(1, t.numero());
@@ -49,7 +49,7 @@ class TransaccionesTest {
 
     @Test
     void alquilerEsUnaSolaTransaccionQueSeEncuentraPorAmbosJugadores() {
-        Propiedad propiedad = new Propiedad(1, "San José", "Grupo", 1000, 100);
+        Propiedad propiedad = new Propiedad(1, "San José", "Grupo", 1000, 100, new Tablero());
         assertTrue(banco.comprarPropiedad(ana, propiedad));
         int saldoBanco = banco.getSaldo();
         assertTrue(banco.cobrarAlquiler(jose, propiedad));
@@ -70,10 +70,10 @@ class TransaccionesTest {
 
     @Test
     void seGeneranLosSieteTiposMinimosConOrigenDestinoCorrectos() {
-        Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100);
+        Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100, new Tablero());
         assertTrue(banco.comprarPropiedad(ana, propiedad));
         assertTrue(banco.cobrarAlquiler(jose, propiedad));
-        assertTrue(banco.cobrarJugador(ana, 10));
+        assertTrue(banco.cobrarImpuesto(ana, 10));
         assertTrue(banco.pagarEntreJugadores(ana, jose, 50, "Pago acordado"));
         assertTrue(banco.pagarGananciaEvento(ana, 200, "Premio de carta"));
         assertTrue(banco.cobrarPerdidaEvento(ana, 100, "Multa de carta"));
@@ -96,7 +96,7 @@ class TransaccionesTest {
     void historialVacioUnicoYConVariosSeRecorreEnAmbosSentidos() {
         assertEquals(0, registro.getHistorial().desdeLaMasAntigua().length);
         assertEquals(0, registro.getHistorial().desdeLaMasReciente().length);
-        assertTrue(banco.cobrarJugador(ana, 10));
+        assertTrue(banco.cobrarImpuesto(ana, 10));
         assertEquals(1, registro.getHistorial().desdeLaMasReciente()[0].numero());
         assertTrue(banco.pagarEntreJugadores(ana, jose, 20, "Pago"));
         assertTrue(banco.pagarSalida(jose, 200));
@@ -115,7 +115,7 @@ class TransaccionesTest {
     @Test
     void pagosFallidosNoCambianSaldosNiGeneranTransacciones() throws Exception {
         String antes = Files.readString(registro.getArchivo());
-        assertFalse(banco.cobrarJugador(ana, 100000));
+        assertFalse(banco.cobrarImpuesto(ana, 100000));
         assertFalse(banco.pagarEntreJugadores(ana, jose, -1, "Pago"));
         assertFalse(banco.pagarEntreJugadores(ana, ana, 1, "Pago"));
         assertFalse(banco.pagarEntreJugadores(ana, jose, 20000, "Pago"));
@@ -130,7 +130,7 @@ class TransaccionesTest {
     @Test
     void exportarIncluyeTodosLosCamposSinModificarElHistorial() throws Exception {
         assertTrue(banco.pagarGananciaEvento(jose, 100, "Carta: premio de José"));
-        assertTrue(banco.cobrarJugador(ana, 10));
+        assertTrue(banco.cobrarImpuesto(ana, 10));
         String reporte = registro.exportar();
         assertTrue(reporte.contains(RegistroTransacciones.COLUMNAS));
         assertTrue(reporte.contains("Carta: premio de José"));
@@ -141,7 +141,7 @@ class TransaccionesTest {
 
     @Test
     void otrasOperacionesDelBancoTambienQuedanRegistradas() {
-        Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100);
+        Propiedad propiedad = new Propiedad(1, "Propiedad", "Grupo", 1000, 100, new Tablero());
         assertTrue(banco.comprarPropiedad(ana, propiedad));
         ana.registrarRecorrido(40);
         for (int i = 0; i < 4; i++) assertTrue(banco.comprarCasa(ana, propiedad));
@@ -156,11 +156,11 @@ class TransaccionesTest {
     void cadaPartidaTieneArchivoYNumeracionIndependientes() {
         RegistroTransacciones otro = new RegistroTransacciones("PRUEBA", carpeta);
         assertNotEquals(registro.getArchivo(), otro.getArchivo());
-        assertTrue(banco.cobrarJugador(ana, 10));
+        assertTrue(banco.cobrarImpuesto(ana, 10));
         assertEquals(0, otro.getHistorial().getCantidad());
         Banco otroBanco = new Banco();
         otroBanco.setRegistroTransacciones(otro);
-        assertTrue(otroBanco.cobrarJugador(jose, 10));
+        assertTrue(otroBanco.cobrarImpuesto(jose, 10));
         assertEquals(1, otro.getHistorial().desdeLaMasAntigua()[0].numero());
     }
 
@@ -170,9 +170,9 @@ class TransaccionesTest {
         try {
             juego.agregarJugador(ana);
             juego.agregarJugador(jose);
-            assertTrue(juego.getBanco().cobrarJugador(ana, 10));
+            assertTrue(juego.getBanco().cobrarImpuesto(ana, 10));
             juego.terminarTurnoActual();
-            assertTrue(juego.getBanco().cobrarJugador(jose, 20));
+            assertTrue(juego.getBanco().cobrarImpuesto(jose, 20));
             Transaccion[] historial = juego.getRegistroTransacciones().getHistorial().desdeLaMasAntigua();
             assertEquals(TipoTransaccion.SALDO_INICIAL, historial[0].tipo());
             assertEquals(1, historial[2].turno());
@@ -188,7 +188,7 @@ class TransaccionesTest {
     @Test
     void errorDeDiscoConservaElPagoYPermiteReexportar() throws Exception {
         Files.delete(registro.getArchivo());
-        assertTrue(banco.cobrarJugador(ana, 10));
+        assertTrue(banco.cobrarImpuesto(ana, 10));
         assertEquals(9990, ana.getSaldo());
         assertEquals(1, registro.getHistorial().getCantidad());
         assertNotNull(registro.getErrorEscritura());

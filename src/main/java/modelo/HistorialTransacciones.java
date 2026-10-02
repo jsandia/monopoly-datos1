@@ -6,19 +6,19 @@ import estructuras.Nodo;
 /**
  * Historial de transacciones de una partida, guardado en una ListaDoble.
  *
- * Por que ListaDoble: el enunciado pide recorrerlo desde la mas antigua y
- * desde la mas reciente. La mas antigua es el primer nodo y se avanza con
- * getSiguiente(); la mas reciente es el ultimo nodo y se retrocede con
+ * Por qué ListaDoble: el enunciado pide recorrerlo desde la más antigua y
+ * desde la más reciente. La más antigua es el primer nodo y se avanza con
+ * getSiguiente(); la más reciente es el último nodo y se retrocede con
  * getAnterior(). Agregar al final es O(1).
  *
- * Los metodos de consulta devuelven arreglos con el resultado, pero el
+ * Los métodos de consulta devuelven arreglos con el resultado, pero el
  * almacenamiento es siempre la lista enlazada.
  */
 public final class HistorialTransacciones {
     private final ListaDoble<Transaccion> transacciones = new ListaDoble<>();
 
     public synchronized void agregar(Transaccion transaccion) {
-        if (transaccion == null) throw new IllegalArgumentException("Transaccion requerida");
+        if (transaccion == null) throw new IllegalArgumentException("Transacción requerida");
         transacciones.agregarAlFinal(transaccion);
     }
 
@@ -49,8 +49,8 @@ public final class HistorialTransacciones {
      * los filtros. Un filtro en null significa "cualquiera".
      *
      * @param jugador          id del jugador que debe participar (origen o destino), o null
-     * @param tipo             tipo de transaccion, o null
-     * @param recientesPrimero true: desde el ultimo nodo con getAnterior();
+     * @param tipo             tipo de transacción, o null
+     * @param recientesPrimero true: desde el último nodo con getAnterior();
      *                         false: desde el primero con getSiguiente()
      */
     public synchronized Transaccion[] consultar(String jugador, TipoTransaccion tipo, boolean recientesPrimero) {

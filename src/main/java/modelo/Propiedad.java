@@ -1,38 +1,41 @@
 package modelo;
+
 import config.Configuracion;
 
 /**
  * Casilla que se puede comprar y en la que se construyen casas y hoteles.
- * Hereda de Casilla para encajar en el Tablero de la GUI,
- * e incluye toda la logica financiera para funcionar con el Banco.
+ *
+ * Además de lo que pide el enunciado (id, nombre, precio de compra,
+ * alquiler y propietario) lleva las casas, el hotel y cuánto ha recorrido
+ * el dueño desde que la compró: para construir hay que dar una vuelta
+ * completa al tablero después de la compra.
  */
 public class Propiedad extends Casilla {
 
     private final String grupo;
     private final int precio;
     private final int alquiler;
-    private final int[] alquileresConstrucciones;
-    private Tablero tablero;
-    private long recorridoDesdeCompra;
-    private boolean vueltaDesdeCompraCompletada;
+    private final int precioCasa;           // 0 = no se construye (transportes y servicios)
+    private final int[] alquileresConstrucciones; // con 1, 2, 3, 4 casas y con hotel
+    private final Tablero tablero;          // para saber si el dueño tiene el grupo completo
 
-    // Atributos para gestion del Banco y Jugadores
     private Jugador propietario;
     private int casas;
     private boolean tieneHotel;
+    private int recorridoDesdeCompra;
+    private boolean vueltaDesdeCompraCompletada;
 
-    private int precioCasa;
-    private int precioHotel;
-
-    public Propiedad(int id, String nombre, String grupo, int precio, int alquiler) {
+    /**
+     * @param precio   precio de compra
+     * @param alquiler alquiler sin casas
+     * @param tablero  el tablero donde está esta propiedad
+     */
+    public Propiedad(int id, String nombre, String grupo, int precio, int alquiler, Tablero tablero) {
         super(id, nombre);
         this.grupo = grupo;
         this.precio = precio;
         this.alquiler = alquiler;
-        this.propietario = null;
-        this.casas = 0;
-        this.tieneHotel = false;
-
+        this.tablero = tablero;
         this.alquileresConstrucciones = alquileresClasicos(alquiler);
         this.precioCasa = switch (grupo) {
             case "Café", "Celeste" -> 50;
@@ -42,62 +45,9 @@ public class Propiedad extends Casilla {
             case "Transporte", "Servicios" -> 0;
             default -> precio / 2;
         };
-        this.precioHotel = precioCasa;
     }
 
-    // --- GETTERS BASICOS ---
-    public String getGrupo() {
-        return grupo;
-    }
-
-    public int getPrecio() {
-        return precio;
-    }
-
-    public int getPrecioCompra() {
-        return precio;
-    }
-
-    public int getAlquiler() {
-        return alquiler;
-    }
-
-    // --- PROPIETARIO ---
-    public Jugador getPropietario() {
-        return propietario;
-    }
-
-    public void setPropietario(Jugador propietario) {
-        if (this.propietario != propietario) {
-            recorridoDesdeCompra = 0;
-            vueltaDesdeCompraCompletada = false;
-        }
-        this.propietario = propietario;
-    }
-
-    /** Cuenta el recorrido desde la compra. Una vuelta cumplida permanece habilitada. */
-    void registrarMovimiento(int pasos) {
-        if (propietario == null || vueltaDesdeCompraCompletada) return;
-        recorridoDesdeCompra += pasos;
-        int longitudVuelta = tablero == null ? Configuracion.CASILLAS_TABLERO : tablero.tamaño();
-        if (recorridoDesdeCompra >= longitudVuelta) vueltaDesdeCompraCompletada = true;
-    }
-
-    public boolean tienePropietario() {
-        return propietario != null;
-    }
-
-    // --- ALQUILER ---
-    public int calcularAlquiler() {
-        if (tieneHotel) return alquileresConstrucciones[4];
-        if (casas > 0) return alquileresConstrucciones[casas - 1];
-        if (esEdificable() && tablero != null && tablero.tieneGrupoCompleto(propietario, grupo)) {
-            return alquiler * 2;
-        }
-        return alquiler;
-    }
-
-    // Valores de las escrituras del tablero clásico: 1, 2, 3, 4 casas y hotel.
+    // Valores de las escrituras del tablero clásico: 1, 2, 3, 4 casas y hotel
     private static int[] alquileresClasicos(int base) {
         return switch (base) {
             case 2 -> new int[]{10, 30, 90, 160, 250};
@@ -120,65 +70,120 @@ public class Propiedad extends Casilla {
         };
     }
 
-    void setTablero(Tablero tablero) {
-        this.tablero = tablero;
+    public String getGrupo() {
+        return grupo;
     }
+
+    public int getPrecioCompra() {
+        return precio;
+    }
+
+    public int getAlquiler() {
+        return alquiler;
+    }
+
+    // =========================================================
+    // PROPIETARIO
+    // =========================================================
+
+    public Jugador getPropietario() {
+        return propietario;
+    }
+
+    public boolean tienePropietario() {
+        return propietario != null;
+    }
+
+    /** Al cambiar de dueño, el nuevo empieza a contar su vuelta desde cero. */
+    public void setPropietario(Jugador propietario) {
+        if (this.propietario != propietario) {
+            recorridoDesdeCompra = 0;
+            vueltaDesdeCompraCompletada = false;
+        }
+        this.propietario = propietario;
+    }
+
+    /**
+     * Suma lo que caminó el dueño (negativo si retrocedió). Una vez cumplida
+     * la vuelta, queda habilitada para siempre.
+     */
+    void registrarMovimiento(int pasos) {
+        if (propietario == null || vueltaDesdeCompraCompletada) return;
+        recorridoDesdeCompra += pasos;
+        if (recorridoDesdeCompra >= tablero.tamaño()) vueltaDesdeCompraCompletada = true;
+    }
+
+    // =========================================================
+    // ALQUILER
+    // =========================================================
+
+    /**
+     * Con hotel o casas se usa la tabla de la escritura. Sin construcciones,
+     * el alquiler se duplica si el dueño tiene todo el grupo de color.
+     */
+    public int calcularAlquiler() {
+        if (tieneHotel) return alquileresConstrucciones[4];
+        if (casas > 0) return alquileresConstrucciones[casas - 1];
+        if (esEdificable() && tablero.tieneGrupoCompleto(propietario, grupo)) return alquiler * 2;
+        return alquiler;
+    }
+
+    // =========================================================
+    // CASAS Y HOTELES
+    // =========================================================
 
     public boolean esEdificable() {
         return precioCasa > 0;
-    }
-
-    /** null si las reglas de la propiedad permiten comprar la próxima casa. */
-    public String motivoNoConstruir(Jugador jugador) {
-        if (jugador == null || propietario != jugador) return "La propiedad no pertenece al jugador en turno.";
-        if (!esEdificable()) return "No se construyen casas en transportes ni servicios.";
-        if (tieneHotel || casas >= Configuracion.MAX_CASAS_POR_PROPIEDAD) return "La propiedad ya tiene el máximo de casas o un hotel.";
-        if (!vueltaDesdeCompraCompletada) {
-            int longitudVuelta = tablero == null ? Configuracion.CASILLAS_TABLERO : tablero.tamaño();
-            return "Debes completar una vuelta desde la compra de " + getNombre()
-                    + ". Te faltan " + (longitudVuelta - recorridoDesdeCompra) + " casillas de recorrido.";
-        }
-        return null;
-    }
-
-    // --- CASAS Y HOTELES ---
-    public int getCantidadCasas() {
-        return casas;
     }
 
     public int getPrecioCasa() {
         return precioCasa;
     }
 
-    public boolean agregarCasa() {
-        if (esEdificable() && casas < Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
-            casas++;
-            return true;
-        }
-        return false;
+    /** El hotel cuesta lo mismo que una casa del grupo. */
+    public int getPrecioHotel() {
+        return precioCasa;
+    }
+
+    public int getCantidadCasas() {
+        return casas;
     }
 
     public boolean tieneHotel() {
         return tieneHotel;
     }
 
-    public int getPrecioHotel() {
-        return precioHotel;
+    /** @return null si el jugador puede construir la próxima casa aquí; si no, el motivo */
+    public String motivoNoConstruir(Jugador jugador) {
+        if (jugador == null || propietario != jugador) return "La propiedad no pertenece al jugador en turno.";
+        if (!esEdificable()) return "No se construyen casas en transportes ni servicios.";
+        if (tieneHotel || casas >= Configuracion.MAX_CASAS_POR_PROPIEDAD) return "La propiedad ya tiene el máximo de casas o un hotel.";
+        if (!vueltaDesdeCompraCompletada) {
+            return "Debes completar una vuelta desde la compra de " + getNombre()
+                    + ". Te faltan " + (tablero.tamaño() - recorridoDesdeCompra) + " casillas de recorrido.";
+        }
+        return null;
     }
 
+    /** @return true si se pudo agregar una casa (máximo 4 y sin hotel) */
+    public boolean agregarCasa() {
+        if (!esEdificable() || tieneHotel || casas >= Configuracion.MAX_CASAS_POR_PROPIEDAD) return false;
+        casas++;
+        return true;
+    }
+
+    /** @return true si se pudo cambiar las 4 casas por un hotel */
     public boolean construirHotel() {
-        if (esEdificable() && casas == Configuracion.MAX_CASAS_POR_PROPIEDAD && !tieneHotel) {
-            casas = 0;
-            tieneHotel = true;
-            return true;
-        }
-        return false;
+        if (!esEdificable() || tieneHotel || casas != Configuracion.MAX_CASAS_POR_PROPIEDAD) return false;
+        casas = 0;
+        tieneHotel = true;
+        return true;
     }
 
     /**
-     * Deja la propiedad como al inicio de la partida: sin dueño, sin casas,
-     * sin hotel. Se usa cuando su dueño queda en bancarrota.
-     * Las casas y el hotel los recupera el Banco antes de llamar a esto.
+     * Deja la propiedad como al inicio de la partida: sin dueño, sin casas y
+     * sin hotel. Se usa cuando su dueño queda en bancarrota; las casas y el
+     * hotel los recupera el Banco antes de llamar a esto.
      */
     void devolverAlBanco() {
         setPropietario(null);
@@ -188,11 +193,11 @@ public class Propiedad extends Casilla {
 
     @Override
     public String getDescripcion() {
-        String estadoProp = (propietario != null) ? "Dueño: " + propietario.getNombre() : "Sin dueño";
+        String dueño = (propietario != null) ? "Dueño: " + propietario.getNombre() : "Sin dueño";
         return "Propiedad del grupo " + grupo + ".\n"
                 + "Precio de compra: ₡" + precio + "\n"
                 + "Alquiler base: ₡" + alquiler + "\n"
-                + "Estado: " + estadoProp + "\n"
+                + "Estado: " + dueño + "\n"
                 + "Casas: " + casas + " | Hotel: " + (tieneHotel ? "Sí" : "No");
     }
 }

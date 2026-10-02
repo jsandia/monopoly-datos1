@@ -79,9 +79,7 @@ public class Tablero {
     // Así el id siempre coincide con la posición y no hay que numerar a mano.
 
     private void propiedad(String nombre, String grupo, int precio, int alquiler) {
-        Propiedad propiedad = new Propiedad(casillas.tamaño(), nombre, grupo, precio, alquiler);
-        propiedad.setTablero(this);
-        casillas.agregarAlFinal(propiedad);
+        casillas.agregarAlFinal(new Propiedad(casillas.tamaño(), nombre, grupo, precio, alquiler, this));
     }
 
     /**

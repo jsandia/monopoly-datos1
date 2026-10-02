@@ -20,8 +20,6 @@ import java.io.Serializable;
  */
 public sealed interface Mensaje extends Serializable
         permits Mensaje.Bienvenida,
-        Mensaje.Ping,
-        Mensaje.Pong,
         Mensaje.Registrarse,
         Mensaje.CrearPartida,
         Mensaje.UnirsePartida,
@@ -48,11 +46,6 @@ public sealed interface Mensaje extends Serializable
 
     record Bienvenida(int computadora) implements Mensaje {}
 
-    record Ping(long enviadoMs) implements Mensaje {}
-
-    record Pong(long enviadoMs) implements Mensaje {}
-
-
     // =========================================================
     // REGISTRO DE USUARIOS
     // =========================================================
@@ -76,7 +69,6 @@ public sealed interface Mensaje extends Serializable
             String jugador2
     ) implements Mensaje {}
 
-
     // =========================================================
     // RESPUESTA DEL SERVIDOR
     // =========================================================
@@ -85,7 +77,6 @@ public sealed interface Mensaje extends Serializable
             String tipo,
             String mensaje
     ) implements Mensaje {}
-
 
     // =========================================================
     // REGISTRO DE TARJETAS RFID (antes de jugar)
@@ -107,7 +98,6 @@ public sealed interface Mensaje extends Serializable
      */
     record ResultadoTarjeta(int jugadorLocal, boolean registrada, String uid, String mensaje)
             implements Mensaje {}
-
 
     // =========================================================
     // PARTIDA: CLIENTE -> SERVIDOR (solo intenciones)
@@ -144,7 +134,6 @@ public sealed interface Mensaje extends Serializable
 
     /** Texto preparado por el servidor, para mostrar o guardar una copia en el cliente. */
     record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Mensaje {}
-
 
     // =========================================================
     // PARTIDA: SERVIDOR -> TODOS LOS CLIENTES
