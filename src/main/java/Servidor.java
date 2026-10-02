@@ -1,6 +1,7 @@
 import config.Configuracion;
 import protocolo.Mensaje;
 import modelo.Casilla;
+import modelo.Dado;
 import modelo.Juego;
 import modelo.Jugador;
 import modelo.Propiedad;
@@ -764,8 +765,8 @@ public class Servidor {
             return "YA_TIRO";
         }
 
-        if (dado1 < 1 || dado1 > 6
-                || dado2 < 1 || dado2 > 6) {
+        // Lo que manda el cajero se revisa con la misma regla de la clase Dado
+        if (!Dado.esValido(dado1) || !Dado.esValido(dado2)) {
             return "DADO_INVALIDO";
         }
 
@@ -843,7 +844,7 @@ public class Servidor {
                 return;
             }
 
-            int[] dados = juego.lanzarDadosSoftware();
+            int[] dados = juego.lanzarDados();
 
             String codigo = aplicarDados(dados[0], dados[1]);
 

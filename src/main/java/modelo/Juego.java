@@ -44,6 +44,11 @@ public class Juego {
     private final ColaCircular<CartaEvento> mazoArcaComunal;
     private final ColaCircular<CartaEvento> mazoSuerte;
 
+    // Los dos dados de la partida. Guardan la ultima tirada, venga del
+    // cajero (dado fisico) o del boton de dados de prueba.
+    private final Dado dado1 = new Dado();
+    private final Dado dado2 = new Dado();
+
     // Constructor que inicializa el juego con limite de turnos y la cantidad de jugadores
     public Juego(int maxTurnos, int cantidadJugadores) {
         this(maxTurnos, cantidadJugadores, "local");
@@ -106,11 +111,24 @@ public class Juego {
         }
     }
 
-    // Genera dos numeros aleatorios de 1 a 6 para simular el tiro de dados en software
-    public int[] lanzarDadosSoftware() {
-        int dado1 = (int) (Math.random() * 6) + 1;
-        int dado2 = (int) (Math.random() * 6) + 1;
-        return new int[]{dado1, dado2};
+    /**
+     * Tira los dos dados en la computadora (botón de dados de prueba, para
+     * jugar sin el cajero). Con el cajero, los dados los tira la Pico.
+     *
+     * @return las dos caras que salieron
+     */
+    public synchronized int[] lanzarDados() {
+        return new int[]{dado1.lanzar(), dado2.lanzar()};
+    }
+
+    /** @return el primer dado, con la cara de la última tirada */
+    public Dado getDado1() {
+        return dado1;
+    }
+
+    /** @return el segundo dado, con la cara de la última tirada */
+    public Dado getDado2() {
+        return dado2;
     }
 
     // =========================================================
@@ -122,19 +140,29 @@ public class Juego {
      * si esta preso intenta salir; si se mueve, cobra Salida al pasar
      * y resuelve la casilla donde cae (alquileres, impuestos, cartas y carcel).
      *
+     * Las caras quedan guardadas en los dos Dado de la partida, sin importar
+     * si vienen del cajero o de lanzarDados().
+     *
+     * @param cara1 lo que salio en el primer dado (1 a 6)
+     * @param cara2 lo que salio en el segundo dado (1 a 6)
      * @return lo que paso, una linea por evento, para mostrar a los jugadores
+     * @throws IllegalArgumentException si alguna cara no es valida
      */
-    public synchronized String jugarTiro(int dado1, int dado2) {
+    public synchronized String jugarTiro(int cara1, int cara2) {
         Jugador actual = turnos.verFrente();
         StringBuilder log = new StringBuilder();
         if (actual == null || !actual.isActivo()) return "";
 
-        int suma = dado1 + dado2;
-        log.append(actual.getNombre()).append(" sacó [").append(dado1).append("][")
-                .append(dado2).append("] = ").append(suma);
+        dado1.registrarValor(cara1);
+        dado2.registrarValor(cara2);
+
+        int suma = dado1.getValor() + dado2.getValor();
+        log.append(actual.getNombre()).append(" sacó [").append(dado1.getValor()).append("][")
+                .append(dado2.getValor()).append("] = ").append(suma);
 
         if (actual.isEnCarcel()) {
-            if (!intentarSalirConDados(actual, dado1 == dado2, log)) {
+            boolean dobles = dado1.getValor() == dado2.getValor();
+            if (!intentarSalirConDados(actual, dobles, log)) {
                 return log.toString(); // sigue preso: no se mueve
             }
         }
