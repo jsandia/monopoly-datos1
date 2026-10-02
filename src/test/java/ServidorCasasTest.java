@@ -51,7 +51,6 @@ class ServidorCasasTest {
         }
         ana = jugadores[0];
         asignar("juego", juego);
-        asignar("tablero", juego.getTablero());
         bytes = new ByteArrayOutputStream();
         salida = new ObjectOutputStream(bytes);
         assertTrue(juego.getBanco().comprarPropiedad(ana, propiedad(1)));

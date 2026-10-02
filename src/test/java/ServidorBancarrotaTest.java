@@ -43,7 +43,6 @@ class ServidorBancarrotaTest {
             juego.agregarJugador(jugadores[i]);
         }
         asignar("juego", juego);
-        asignar("tablero", juego.getTablero());
     }
     @AfterEach void limpiar() throws Exception {
         Files.deleteIfExists(juego.getArchivoTransacciones());

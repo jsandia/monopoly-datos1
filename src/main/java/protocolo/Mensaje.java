@@ -41,46 +41,34 @@ public sealed interface Mensaje extends Serializable
         Mensaje.HistorialTransacciones {
 
     // =========================================================
-    // CONEXIÓN
+    // ANTES DE JUGAR: CONEXIÓN, USUARIOS Y PARTIDAS
     // =========================================================
 
+    /** Servidor → cliente al conectarse: qué número de computadora le tocó (0 o 1). */
     record Bienvenida(int computadora) implements Mensaje {}
 
-    // =========================================================
-    // REGISTRO DE USUARIOS
-    // =========================================================
+    record Registrarse(String nombre) implements Mensaje {}
 
-    record Registrarse(
-            String nombre
-    ) implements Mensaje {}
+    /** La computadora que crea la partida pone a los jugadores 1 y 2. */
+    record CrearPartida(String jugador1, String jugador2) implements Mensaje {}
 
-    // =========================================================
-    // PARTIDAS
-    // =========================================================
+    /** La otra computadora se une con el código y pone a los jugadores 3 y 4. */
+    record UnirsePartida(String codigo, String jugador1, String jugador2) implements Mensaje {}
 
-    record CrearPartida(
-            String jugador1,
-            String jugador2
-    ) implements Mensaje {}
-
-    record UnirsePartida(
-            String codigo,
-            String jugador1,
-            String jugador2
-    ) implements Mensaje {}
-
-    // =========================================================
-    // RESPUESTA DEL SERVIDOR
-    // =========================================================
-
-    record Respuesta(
-            String tipo,
-            String mensaje
-    ) implements Mensaje {}
-
-    // =========================================================
-    // REGISTRO DE TARJETAS RFID (antes de jugar)
-    // =========================================================
+    /**
+     * Servidor → cliente: respuesta a Registrarse, CrearPartida o UnirsePartida.
+     * tipo es una de las constantes de abajo; al crear la partida, mensaje es el código.
+     */
+    record Respuesta(String tipo, String mensaje) implements Mensaje {
+        public static final String ERROR = "ERROR";
+        public static final String REGISTRO_OK = "REGISTRO_OK";
+        public static final String USUARIO_EXISTE = "USUARIO_EXISTE";
+        public static final String USUARIO_NO_EXISTE = "USUARIO_NO_EXISTE";
+        public static final String PARTIDA_CREADA = "PARTIDA_CREADA";
+        public static final String PARTIDA_NO_EXISTE = "PARTIDA_NO_EXISTE";
+        public static final String PARTIDA_LLENA = "PARTIDA_LLENA";
+        public static final String PARTIDA_UNIDA = "PARTIDA_UNIDA";
+    }
 
     /**
      * Cliente → servidor: "el próximo UID que lea el cajero es de mi
@@ -100,12 +88,12 @@ public sealed interface Mensaje extends Serializable
             implements Mensaje {}
 
     // =========================================================
-    // PARTIDA: CLIENTE -> SERVIDOR (solo intenciones)
+    // PARTIDA: CLIENTE → SERVIDOR (solo intenciones)
     // =========================================================
-    // No llevan datos: el servidor sabe de qué computadora vienen,
+    // No llevan quién las manda: el servidor sabe de qué computadora vienen,
     // revisa que le toque a un jugador de esa computadora y decide.
 
-    /** Pide que el SERVIDOR tire dados al azar (para probar sin el cajero). */
+    /** Pide que el servidor tire dados al azar (para probar sin el cajero). */
     record TirarDadosPrueba() implements Mensaje {}
 
     record ComprarPropiedad() implements Mensaje {}
@@ -113,11 +101,6 @@ public sealed interface Mensaje extends Serializable
     record ComprarCasa(int idPropiedad) implements Mensaje {}
 
     record ComprarHotel(int idPropiedad) implements Mensaje {}
-
-    /** Datos oficiales de una propiedad; propietario es el índice del jugador o -1. */
-    record EstadoPropiedad(int id, int propietario, int casas, boolean hotel,
-            int renta, int precioCasa, String motivoNoComprarCasa,
-            int precioHotel, String motivoNoComprarHotel) implements Serializable {}
 
     record TerminarTurno() implements Mensaje {}
 
@@ -127,29 +110,28 @@ public sealed interface Mensaje extends Serializable
     /** Estando preso y antes de tirar: usar una carta "Salga de la cárcel". */
     record UsarCartaCarcel() implements Mensaje {}
 
-    /** Filtros opcionales y orden; el servidor conserva y consulta el historial oficial. */
+    /** Filtros opcionales (null = todos) y orden del historial. */
     record ConsultarTransacciones(String jugador, String tipo, boolean recientesPrimero) implements Mensaje {}
 
     record ExportarTransacciones() implements Mensaje {}
 
-    /** Texto preparado por el servidor, para mostrar o guardar una copia en el cliente. */
-    record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Mensaje {}
-
     // =========================================================
-    // PARTIDA: SERVIDOR -> TODOS LOS CLIENTES
+    // PARTIDA: SERVIDOR → CLIENTES
     // =========================================================
 
     /** Se tiraron los dados (del cajero o de prueba). indiceJugador va de 0 a 3. */
-    record Dados(
-            int indiceJugador,
-            int dado1,
-            int dado2
-    ) implements Mensaje {}
+    record Dados(int indiceJugador, int dado1, int dado2) implements Mensaje {}
 
     /** Una línea para el "Registro de Partida" (o un error solo para quien lo causó). */
-    record Aviso(
-            String texto
-    ) implements Mensaje {}
+    record Aviso(String texto) implements Mensaje {}
+
+    /** Historial preparado por el servidor, para mostrarlo o guardarlo como TXT. */
+    record HistorialTransacciones(String texto, String nombreArchivo, boolean exportacion) implements Mensaje {}
+
+    /** Datos oficiales de una propiedad; propietario es el índice del jugador o -1. */
+    record EstadoPropiedad(int id, int propietario, int casas, boolean hotel,
+            int renta, int precioCasa, String motivoNoComprarCasa,
+            int precioHotel, String motivoNoComprarHotel) implements Serializable {}
 
     /**
      * Foto completa de la partida. Los arreglos tienen una posición por

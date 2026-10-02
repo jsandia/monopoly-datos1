@@ -4,12 +4,18 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
-// Atiende la conexion con el cajero (Raspberry Pi Pico 2W).
-// La Pico manda texto, una linea por mensaje, con partes separadas por ';':
-//   HOLA;CAJERO        -> saludo al conectarse
-//   DADOS;d1;d2        -> tirada de dos dados
-//   TARJETA;UID        -> tarjeta RFID leida (UID en hexadecimal)
-// Cada dato que llega se le pasa a Servidor.
+/**
+ * Atiende la conexión con el cajero (Raspberry Pi Pico 2W), en su propio hilo.
+ *
+ * La Pico manda texto, una línea por mensaje, con partes separadas por ";":
+ * <pre>
+ *   HOLA;CAJERO   → saludo al conectarse
+ *   DADOS;d1;d2   → tirada de dos dados
+ *   TARJETA;UID   → tarjeta RFID leída (UID en hexadecimal)
+ * </pre>
+ * Cada dato que llega se le pasa al Servidor, y se le contesta a la Pico
+ * con OK_... o con ERROR;MOTIVO.
+ */
 public class ManejadorCajero implements Runnable {
 
     private final Socket socketCajero;
@@ -29,12 +35,12 @@ public class ManejadorCajero implements Runnable {
              PrintWriter escritor = new PrintWriter(socket.getOutputStream(), true)) {
 
             String linea;
-            // readLine() espera hasta que llegue una linea completa (terminada en \n).
-            // Devuelve null cuando la Pico cierra la conexion.
+            // readLine() espera hasta que llegue una línea completa (terminada en \n).
+            // Devuelve null cuando la Pico cierra la conexión.
             while ((linea = lector.readLine()) != null) {
                 procesarMensaje(linea.trim(), escritor);
             }
-            System.out.println("El cajero se desconecto.");
+            System.out.println("El cajero se desconectó.");
 
         } catch (IOException e) {
             // "Connection reset" es normal cuando la Pico se reinicia de golpe

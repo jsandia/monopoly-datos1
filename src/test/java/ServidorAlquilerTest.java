@@ -63,7 +63,6 @@ class ServidorAlquilerTest {
             juego.agregarJugador(jugadores[i]);
         }
         asignar("juego", juego);
-        asignar("tablero", juego.getTablero());
         salida = new ObjectOutputStream(new ByteArrayOutputStream());
 
         // El aeropuerto de la casilla 5 es del jugador 1: alquiler ₡25

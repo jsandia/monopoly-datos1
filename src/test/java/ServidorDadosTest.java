@@ -34,7 +34,6 @@ class ServidorDadosTest {
             juego.agregarJugador(jugadores[i]);
         }
         asignar("juego", juego);
-        asignar("tablero", juego.getTablero());
     }
 
     @AfterEach void limpiar() throws Exception {

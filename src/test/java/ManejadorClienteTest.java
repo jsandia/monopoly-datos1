@@ -58,10 +58,10 @@ class ManejadorClienteTest {
         in.readObject(); // Bienvenida
 
         Mensaje.Respuesta registro = (Mensaje.Respuesta) enviarYRecibir(new Mensaje.Registrarse("Ana"));
-        assertEquals("REGISTER_OK", registro.tipo());
+        assertEquals(Mensaje.Respuesta.REGISTRO_OK, registro.tipo());
 
         Mensaje.Respuesta repetido = (Mensaje.Respuesta) enviarYRecibir(new Mensaje.Registrarse("ana"));
-        assertEquals("USER_EXISTS", repetido.tipo());
+        assertEquals(Mensaje.Respuesta.USUARIO_EXISTE, repetido.tipo());
     }
 
     @Test void ignoraMensajesQueSoloPuedeMandarElServidor() throws Exception {
@@ -70,7 +70,7 @@ class ManejadorClienteTest {
         out.flush();
         // Sigue atendiendo normal: el siguiente mensaje tiene respuesta
         Mensaje.Respuesta registro = (Mensaje.Respuesta) enviarYRecibir(new Mensaje.Registrarse("Ana"));
-        assertEquals("REGISTER_OK", registro.tipo());
+        assertEquals(Mensaje.Respuesta.REGISTRO_OK, registro.tipo());
     }
 
     @Test void alDesconectarseDejaDeRecibirMensajes() throws Exception {
