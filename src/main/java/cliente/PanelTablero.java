@@ -17,6 +17,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
@@ -398,17 +399,17 @@ public class PanelTablero extends JPanel {
                 default -> { return; }
             }
             int anchoFranja = lado == Lado.ABAJO || lado == Lado.ARRIBA ? r.width : r.height;
-            int tamano = Math.max(3, Math.min(grosor - 3, (anchoFranja - 8) / 4 - 2));
+            int tamaño = Math.max(3, Math.min(grosor - 3, (anchoFranja - 8) / 4 - 2));
             int cantidad = hotel ? 1 : casas;
-            int ancho = hotel ? tamano * 2 : tamano;
+            int ancho = hotel ? tamaño * 2 : tamaño;
             int total = cantidad * ancho + (cantidad - 1) * 3;
             dibujo.setStroke(new BasicStroke(1f));
             for (int i = 0; i < cantidad; i++) {
                 int x = -total / 2 + i * (ancho + 3);
-                int y = -tamano / 2;
-                java.awt.Polygon silueta = new java.awt.Polygon(
+                int y = -tamaño / 2;
+                Polygon silueta = new Polygon(
                         new int[]{x, x + ancho / 2, x + ancho, x + ancho, x},
-                        new int[]{y + tamano / 3, y, y + tamano / 3, y + tamano, y + tamano}, 5);
+                        new int[]{y + tamaño / 3, y, y + tamaño / 3, y + tamaño, y + tamaño}, 5);
                 dibujo.setColor(Color.WHITE);
                 dibujo.draw(silueta);
                 dibujo.setColor(new Color(hotel ? 0xD32F2F : 0x008F39));
@@ -417,12 +418,12 @@ public class PanelTablero extends JPanel {
                 dibujo.draw(silueta);
                 dibujo.setColor(Color.WHITE);
                 if (hotel) {
-                    dibujo.setFont(new Font("SansSerif", Font.BOLD, Math.max(6, tamano * 2 / 3)));
+                    dibujo.setFont(new Font("SansSerif", Font.BOLD, Math.max(6, tamaño * 2 / 3)));
                     FontMetrics letras = dibujo.getFontMetrics();
                     dibujo.drawString("H", x + (ancho - letras.stringWidth("H")) / 2,
-                            y + tamano - 1);
+                            y + tamaño - 1);
                 } else {
-                    dibujo.fillRect(x + ancho / 2 - 1, y + tamano * 2 / 3, 2, Math.max(2, tamano / 3));
+                    dibujo.fillRect(x + ancho / 2 - 1, y + tamaño * 2 / 3, 2, Math.max(2, tamaño / 3));
                 }
             }
         } finally {
@@ -440,7 +441,7 @@ public class PanelTablero extends JPanel {
         if (casilla instanceof CasillaEspecial esp) {
             return switch (esp.getTipo()) {
                 case IMPUESTO -> "Pagá ₡" + esp.getMonto();
-                case SALIDA -> "Cobrá ₡200";
+                case SALIDA -> "Cobrá ₡" + Configuracion.PREMIO_SALIDA;
                 default -> "";
             };
         }
@@ -530,36 +531,36 @@ public class PanelTablero extends JPanel {
         int altoBanner = (int) (lado * 0.11);
         int altoSub = (int) (altoBanner * 0.55);
 
-        int tamanoDado = (int) (altoBanner * 0.85);
-        int espacio = (int) (tamanoDado * 0.35);
-        int anchoTotal = tamanoDado * 2 + espacio;
+        int tamañoDado = (int) (altoBanner * 0.85);
+        int espacio = (int) (tamañoDado * 0.35);
+        int anchoTotal = tamañoDado * 2 + espacio;
 
         int dadosY = cy + 8 + altoSub + 12;
         int dado1X = cx - anchoTotal / 2;
-        int dado2X = dado1X + tamanoDado + espacio;
+        int dado2X = dado1X + tamañoDado + espacio;
 
-        dibujarUnDado(g2, dado1X, dadosY, tamanoDado, dado1);
-        dibujarUnDado(g2, dado2X, dadosY, tamanoDado, dado2);
+        dibujarUnDado(g2, dado1X, dadosY, tamañoDado, dado1);
+        dibujarUnDado(g2, dado2X, dadosY, tamañoDado, dado2);
     }
 
     /** Dibuja un solo dado (cuadrado blanco con puntos negros) en la posición dada. */
-    private void dibujarUnDado(Graphics2D g2, int x, int y, int tamano, int valor) {
-        int radioEsquina = tamano / 5;
+    private void dibujarUnDado(Graphics2D g2, int x, int y, int tamaño, int valor) {
+        int radioEsquina = tamaño / 5;
 
         g2.setColor(Color.WHITE);
-        g2.fillRoundRect(x, y, tamano, tamano, radioEsquina, radioEsquina);
+        g2.fillRoundRect(x, y, tamaño, tamaño, radioEsquina, radioEsquina);
         g2.setColor(BORDE);
         g2.setStroke(new BasicStroke(2f));
-        g2.drawRoundRect(x, y, tamano, tamano, radioEsquina, radioEsquina);
+        g2.drawRoundRect(x, y, tamaño, tamaño, radioEsquina, radioEsquina);
 
-        int pad = tamano / 5;
+        int pad = tamaño / 5;
         int izq = x + pad;
-        int der = x + tamano - pad;
+        int der = x + tamaño - pad;
         int arriba = y + pad;
-        int abajo = y + tamano - pad;
-        int medioX = x + tamano / 2;
-        int medioY = y + tamano / 2;
-        int radioPunto = Math.max(3, tamano / 9);
+        int abajo = y + tamaño - pad;
+        int medioX = x + tamaño / 2;
+        int medioY = y + tamaño / 2;
+        int radioPunto = Math.max(3, tamaño / 9);
 
         g2.setColor(new Color(0x1B1B1B));
 

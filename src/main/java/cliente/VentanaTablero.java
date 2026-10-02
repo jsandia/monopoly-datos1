@@ -9,7 +9,9 @@ import modelo.Tablero;
 import protocolo.Mensaje;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JComboBox;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -38,45 +40,46 @@ import java.util.function.Consumer;
  */
 public class VentanaTablero extends JFrame {
 
+    // ---- Detalle de la casilla seleccionada ----
     private final JLabel etiquetaNombre = new JLabel("Hacé clic en una casilla");
     private final JLabel etiquetaTipo = new JLabel(" ");
     private final JTextArea areaDescripcion = new JTextArea();
+    private Casilla casillaSeleccionada;
 
-    // --- Atributos de control agregados para el motor del juego ---
+    // ---- Estado de la partida ----
     private final JLabel etiquetaTurnoJugador = new JLabel("Turno: -");
     private final JLabel etiquetaSaldoJugador = new JLabel("Saldo: ₡0");
-    private final JTextArea areaConsola = new JTextArea();
+    private final JLabel etiquetaIndicacion = new JLabel("Esperando a la otra computadora…");
+    private final JLabel etiquetaJugadores = new JLabel(" ");
+    private final JTextArea areaConsola = new JTextArea(); // "Registro de Partida"
 
+    // ---- Botones: solo mandan intenciones; el servidor decide ----
     // Los dados los tira el cajero; este botón pide al servidor unos al azar para probar sin la Pico
     private final JButton botonLanzarDados = new JButton("🎲 Dados de prueba (sin cajero)");
     private final JButton botonComprar = new JButton("🏠 Comprar Propiedad");
+    private final JButton botonComprarCasa = new JButton("Comprar casas / hotel");
     private final JButton botonTerminarTurno = new JButton("➡️ Terminar Turno");
     private final JButton botonPagarMulta = new JButton("🔓 Pagar multa de la cárcel");
     private final JButton botonUsarCarta = new JButton("🃏 Usar carta \"Salga de la cárcel\"");
     private final JButton botonHistorial = new JButton("Historial y exportar TXT");
-    private final JButton botonComprarCasa = new JButton("Comprar casas / hotel");
-    private Mensaje.EstadoJuego ultimoEstado;
     private final JButton botonPropiedades = new JButton("Propiedades de los jugadores");
+
+    private final PanelTablero panelTablero;
+    private final Tablero modeloTablero = new Tablero(); // solo para dibujar y describir las casillas
     private VentanaPropiedades ventanaPropiedades;
-    private Casilla casillaSeleccionada;
     private VentanaHistorial ventanaHistorial;
+    private Mensaje.EstadoJuego ultimoEstado;
     private String[] nombresJugadores = new String[0];
-
-    private final JLabel etiquetaIndicacion = new JLabel("Esperando a la otra computadora…");
-    private final JLabel etiquetaJugadores = new JLabel(" ");
-
-    private PanelTablero panelTablero;
-    private Tablero modeloTablero; // solo para dibujar y mostrar el detalle de las casillas
-
-    // --- Conexión con el servidor ---
-    private final int miComputadora;               // 0 o 1: el número que el servidor le dio a esta computadora
-    private final Consumer<Mensaje> enviar;        // manda una intención al servidor
     private boolean finMostrado = false;
 
-    // --- Animación de los dados ---
+    // ---- Conexión con el servidor ----
+    private final int miComputadora;        // 0 o 1: el número que el servidor le dio a esta computadora
+    private final Consumer<Mensaje> enviar; // manda una intención al servidor
+
+    // ---- Animación de los dados ----
     private final Random random = new Random();
-    private Timer temporizadorDados;                // != null mientras los dados están girando
-    private Mensaje.EstadoJuego estadoPendiente;    // estado que llegó mientras giraban
+    private Timer temporizadorDados;             // != null mientras los dados están girando
+    private Mensaje.EstadoJuego estadoPendiente; // estado que llegó mientras giraban
 
     /**
      * @param miComputadora el número (0 o 1) que el servidor le dio a esta computadora
@@ -85,30 +88,26 @@ public class VentanaTablero extends JFrame {
     public VentanaTablero(int miComputadora, Consumer<Mensaje> enviar) {
         super("Monopoly Costa Rica — Tablero");
         setDefaultCloseOperation(EXIT_ON_CLOSE); // cerrar la ventana termina el programa
-
         this.miComputadora = miComputadora;
         this.enviar = enviar;
 
         // BorderLayout reparte la ventana en zonas: CENTER crece, EAST tiene ancho fijo
         setLayout(new BorderLayout());
-
-        this.modeloTablero = new Tablero();
-
-        this.panelTablero = new PanelTablero(modeloTablero);
+        panelTablero = new PanelTablero(modeloTablero);
         add(panelTablero, BorderLayout.CENTER);
         add(crearPanelLateral(), BorderLayout.EAST);
 
-        // Conexión panel -> ventana: cuando el panel detecta un clic en una casilla,
-        // llama a mostrarCasilla(casilla). "this::mostrarCasilla" es una referencia
-        // al método, equivalente a  casilla -> mostrarCasilla(casilla).
+        // Cuando el panel detecta un clic en una casilla, llama a mostrarCasilla(casilla).
+        // "this::mostrarCasilla" es una referencia al método: casilla -> mostrarCasilla(casilla).
         panelTablero.setAlSeleccionar(this::mostrarCasilla);
-
         configurarEventosBotones();
 
         pack();                       // ajusta la ventana al tamaño preferido de sus componentes
         setLocationRelativeTo(null);  // centrada en la pantalla
     }
 
+    // Panel de la derecha, de arriba hacia abajo: estado del turno, detalle de
+    // la casilla, botones y registro de partida
     private JPanel crearPanelLateral() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); // apila de arriba hacia abajo
@@ -116,10 +115,17 @@ public class VentanaTablero extends JFrame {
         panel.setBackground(new Color(0xFBF9F3));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 16, 20, 16));
 
+        etiquetaTurnoJugador.setFont(new Font("SansSerif", Font.BOLD, 16));
+        etiquetaTurnoJugador.setForeground(new Color(0x2C3E50));
+        etiquetaSaldoJugador.setFont(new Font("SansSerif", Font.BOLD, 14));
+        etiquetaSaldoJugador.setForeground(new Color(0x27AE60));
+        etiquetaIndicacion.setFont(new Font("SansSerif", Font.BOLD, 13));
+        etiquetaIndicacion.setForeground(new Color(0xC0392B));
+        etiquetaJugadores.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
         etiquetaNombre.setFont(new Font("SansSerif", Font.BOLD, 20));
         etiquetaTipo.setFont(new Font("SansSerif", Font.PLAIN, 13));
         etiquetaTipo.setForeground(new Color(0x666666));
-
         areaDescripcion.setEditable(false);
         areaDescripcion.setLineWrap(true);
         areaDescripcion.setWrapStyleWord(true);
@@ -127,80 +133,41 @@ public class VentanaTablero extends JFrame {
         areaDescripcion.setBackground(panel.getBackground());
         areaDescripcion.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
 
-        panel.add(etiquetaNombre);
-        panel.add(etiquetaTipo);
-        panel.add(areaDescripcion);
+        // Todos los botones: mismo alto, apagados hasta que llegue el primer estado
+        JPanel panelBotones = new JPanel();
+        panelBotones.setLayout(new BoxLayout(panelBotones, BoxLayout.Y_AXIS));
+        panelBotones.setOpaque(false);
+        JButton[] botones = {botonLanzarDados, botonComprar, botonComprarCasa, botonTerminarTurno,
+                botonPagarMulta, botonUsarCarta, botonHistorial, botonPropiedades};
+        for (int i = 0; i < botones.length; i++) {
+            botones[i].setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+            botones[i].setEnabled(false);
+            if (i > 0) panelBotones.add(Box.createRigidArea(new Dimension(0, 5)));
+            panelBotones.add(botones[i]);
+        }
 
-        // Componentes interactivos del juego integrados al panel lateral
-        etiquetaTurnoJugador.setFont(new Font("SansSerif", Font.BOLD, 16));
-        etiquetaTurnoJugador.setForeground(new Color(0x2C3E50));
-
-        etiquetaSaldoJugador.setFont(new Font("SansSerif", Font.BOLD, 14));
-        etiquetaSaldoJugador.setForeground(new Color(0x27AE60));
-
+        // El registro va dentro de un JScrollPane: sin él, el JTextArea crece hacia
+        // abajo y los mensajes nuevos quedan fuera de la ventana, sin forma de verlos.
         areaConsola.setEditable(false);
         areaConsola.setLineWrap(true);
         areaConsola.setWrapStyleWord(true);
         areaConsola.setFont(new Font("Monospaced", Font.PLAIN, 11));
         areaConsola.setBackground(new Color(0xEAEDED));
-
-        // El registro va dentro de un JScrollPane: sin él, el JTextArea crece hacia
-        // abajo y los mensajes nuevos quedan fuera de la ventana, sin forma de verlos.
         JScrollPane scrollConsola = new JScrollPane(areaConsola);
         scrollConsola.setBorder(BorderFactory.createTitledBorder("Registro de Partida"));
         scrollConsola.setPreferredSize(new Dimension(248, 260));
 
-        JPanel panelBotones = new JPanel();
-        panelBotones.setLayout(new BoxLayout(panelBotones, BoxLayout.Y_AXIS));
-        panelBotones.setOpaque(false);
-
-        botonLanzarDados.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonComprar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonComprarCasa.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonComprarCasa.setEnabled(false);
-        botonTerminarTurno.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonPagarMulta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonUsarCarta.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-
-        botonLanzarDados.setEnabled(false);
-        botonPagarMulta.setEnabled(false);
-        botonUsarCarta.setEnabled(false);
-        botonComprar.setEnabled(false);
-        botonTerminarTurno.setEnabled(false);
-        botonHistorial.setEnabled(false);
-        botonHistorial.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonPropiedades.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
-        botonPropiedades.setEnabled(false);
-
-        etiquetaIndicacion.setFont(new Font("SansSerif", Font.BOLD, 13));
-        etiquetaIndicacion.setForeground(new Color(0xC0392B));
-        etiquetaJugadores.setFont(new Font("SansSerif", Font.PLAIN, 12));
-
-        panelBotones.add(botonLanzarDados);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonComprar);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonComprarCasa);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonTerminarTurno);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonPagarMulta);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonUsarCarta);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonHistorial);
-        panelBotones.add(javax.swing.Box.createRigidArea(new Dimension(0, 5)));
-        panelBotones.add(botonPropiedades);
-
-        panel.add(etiquetaTurnoJugador, 0);
-        panel.add(etiquetaSaldoJugador, 1);
-        panel.add(etiquetaIndicacion, 2);
-        panel.add(etiquetaJugadores, 3);
-        panel.add(javax.swing.Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(etiquetaTurnoJugador);
+        panel.add(etiquetaSaldoJugador);
+        panel.add(etiquetaIndicacion);
+        panel.add(etiquetaJugadores);
+        panel.add(etiquetaNombre);
+        panel.add(etiquetaTipo);
+        panel.add(areaDescripcion);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
         panel.add(panelBotones);
-        panel.add(javax.swing.Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
         panel.add(scrollConsola);
-
         return panel;
     }
 
@@ -465,7 +432,7 @@ public class VentanaTablero extends JFrame {
 
     private void elegirPropiedadParaCasa() {
         if (ultimoEstado == null) return;
-        javax.swing.JComboBox<OpcionCasa> opciones = new javax.swing.JComboBox<>();
+        JComboBox<OpcionCasa> opciones = new JComboBox<>();
         for (Mensaje.EstadoPropiedad p : ultimoEstado.propiedades()) {
             if (p != null && p.propietario() == ultimoEstado.enTurno() && p.precioCasa() > 0) {
                 opciones.addItem(new OpcionCasa(p, modeloTablero.obtenerCasilla(p.id()).getNombre()));

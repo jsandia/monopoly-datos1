@@ -1,5 +1,7 @@
 package modelo;
 
+import config.Configuracion;
+
 /**
  * Casillas que no se compran ni dan cartas: las cuatro esquinas y los impuestos.
  */
@@ -29,10 +31,12 @@ public class CasillaEspecial extends Casilla {
         // switch "con flechas": cada caso devuelve un valor y no hace falta break.
         // Como cubre todos los valores del enum, el compilador exige que estén todos.
         return switch (tipo) {
-            case SALIDA -> "Punto de partida.\nCada vez que se pasa por aquí se cobran ₡200.";
+            case SALIDA -> "Punto de partida.\nCada vez que se pasa por aquí se cobran ₡"
+                    + Configuracion.PREMIO_SALIDA + ".";
             case CARCEL -> "Cárcel.\nQuien solo pasa por aquí está \"de visita\".";
             case PARQUEO_LIBRE -> "Parqueo libre.\nNo pasa nada, es un descanso.";
-            case IR_A_CARCEL -> "Vaya directo a la cárcel,\nsin pasar por Salida ni cobrar ₡200.";
+            case IR_A_CARCEL -> "Vaya directo a la cárcel,\nsin pasar por Salida ni cobrar ₡"
+                    + Configuracion.PREMIO_SALIDA + ".";
             case IMPUESTO -> "Impuesto.\nSe pagan ₡" + monto + " al banco.";
         };
     }

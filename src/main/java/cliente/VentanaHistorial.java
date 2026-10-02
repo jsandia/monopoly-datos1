@@ -16,18 +16,24 @@ import javax.swing.JTextArea;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.function.Consumer;
 
-/** Consulta el historial oficial; el cliente solo muestra y guarda el texto recibido. */
+/**
+ * Consulta el historial de transacciones del servidor, con filtros por jugador
+ * y por tipo, en los dos órdenes, y lo exporta a TXT. El cliente solo muestra
+ * y guarda el texto que le manda el servidor: el historial oficial vive allá.
+ */
 public final class VentanaHistorial extends JDialog {
     private final JComboBox<String> jugador = new JComboBox<>();
     private final JComboBox<String> tipo = new JComboBox<>();
-    private final JComboBox<String> orden = new JComboBox<>(new String[]{"Mas antigua primero", "Mas reciente primero"});
+    private final JComboBox<String> orden = new JComboBox<>(new String[]{"Más antigua primero", "Más reciente primero"});
     private final JTextArea texto = new JTextArea();
     private final Consumer<Mensaje> enviar;
 
@@ -53,7 +59,7 @@ public final class VentanaHistorial extends JDialog {
         JButton exportar = new JButton("Exportar toda la partida a TXT");
         exportar.addActionListener(evento -> enviar.accept(new Mensaje.ExportarTransacciones()));
         texto.setEditable(false);
-        texto.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+        texto.setFont(new Font("Monospaced", Font.PLAIN, 12));
         setLayout(new BorderLayout());
         add(controles, BorderLayout.NORTH);
         add(new JScrollPane(texto), BorderLayout.CENTER);
@@ -83,7 +89,7 @@ public final class VentanaHistorial extends JDialog {
         selector.setSelectedFile(new File(respuesta.nombreArchivo()));
         if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         Path archivo = selector.getSelectedFile().toPath();
-        if (!archivo.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".txt")) {
+        if (!archivo.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".txt")) {
             archivo = archivo.resolveSibling(archivo.getFileName() + ".txt");
         }
         if (Files.exists(archivo) && JOptionPane.showConfirmDialog(this,
@@ -94,7 +100,7 @@ public final class VentanaHistorial extends JDialog {
             JOptionPane.showMessageDialog(this, "Historial guardado en " + archivo.toAbsolutePath());
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "No se pudo guardar el TXT: " + e.getMessage(),
-                    "Error de exportacion", JOptionPane.ERROR_MESSAGE);
+                    "Error de exportación", JOptionPane.ERROR_MESSAGE);
         }
     }
 }
