@@ -28,6 +28,7 @@ import java.awt.Font;
 import java.util.Random;
 import java.util.function.Consumer;
 
+
 /**
  * La ventana (JFrame) que muestra el tablero. Solo arma las piezas:
  * el PanelTablero al centro y un panel lateral con el detalle de la
